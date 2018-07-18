@@ -22,8 +22,10 @@ PAGEFIELD = "Paginanummer"
 IDFIELD = "Artikel ID"
 KBIDFIELD = "KB-identifier"
 XMLDIR = "/var/www/data"
+OCRSUFFIX = ":ocr"
 METADATAFILE = XMLDIR+"/frank-dutch.csv"
 PREANNOTATEDFILE = XMLDIR+"/db.txt.org"
+ANNOTATIONSFILE = "/tmp"+"/annotations.tsv"
 SEPARATORCOMMA = ","
 SEPARATORTAB = "\t"
 SCRIPTURL = "http://localhost/cgi-bin/link-articles.py"
@@ -54,7 +56,10 @@ SCRIPTTEXT = """
                 divElements = tdElements[i].children;
                 for (var j = 0; j < divElements.length; j++) {
                     if (divElements[j].id != "") {
-                        alert(tdElements[i].id.slice(2)+" "+divElements[j].id)
+                        form = document.forms["saveAnnotation"];
+                        form.elements["textId"].value = divElements[j].id;
+                        form.elements["metadataId"].value = tdElements[i].id.slice(2);
+                        form.submit()
                     }
                 }
                 trElement.style.backgroundColor = "lightgreen"
@@ -67,16 +72,22 @@ SCRIPTTEXT = """
 def readTexts(newspaper,date,page):
     texts = []
     xmlFileName = XMLDIR+"/"+newspaper+"-"+date+"-"+page+".xml"
-    try: 
-        dataRoot = ET.parse(xmlFileName).getroot()
-        for text in dataRoot:
-            textData = ""
-            for paragraph in text: textData += paragraph.text+" "
-            utfData = textData.encode("utf-8")
-            utfData = re.sub(r'"',"''",utfData)
-            texts.append({"text":utfData,"id":text.attrib["id"]})
-        texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
-    except: pass
+    print("<br>READ 1")
+#   try: 
+    print("<br>READ 2")
+    dataRoot = ET.parse(xmlFileName).getroot()
+    print("<br>READ 3")
+    for text in dataRoot:
+        textData = ""
+        for paragraph in text: textData += paragraph.text+" "
+        utfData = textData.encode("utf-8")
+        utfData = re.sub(r'"',"''",utfData)
+        texts.append({"text":utfData,"id":text.attrib["id"]})
+    print("<br>READ 4")
+    texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
+    print("<br>READ 5")
+#   except:
+#       print("<br>READ ERROR")
     return(texts)
  
 def readMetaData(newspaper,date,page):
@@ -93,23 +104,26 @@ def readMetaData(newspaper,date,page):
     except: pass
     return(dataOut)
 
-def readPreannotated():
-    dataOut = {}
+def readAnnotations(fileName,preAnnotated):
+    annotated = dict(preAnnotated)
     try: 
-        inFile = open(PREANNOTATEDFILE,"r")
+        inFile = open(fileName,"r")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
-            if row[KBIDFIELD] != "":
-                dataOut[row[IDFIELD]] = row[KBIDFIELD]
+            if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
+                if not re.search(OCRSUFFIX+"$",row[KBIDFIELD]):
+                    row[KBIDFIELD] += OCRSUFFIX
+                annotated[row[IDFIELD]] = row[KBIDFIELD]
         inFile.close()
-    except: sys.exit(COMMAND+": error processing file "+PREANNOTATEDFILE)
-    return(dataOut)
+    except: sys.exit(COMMAND+": error processing file "+fileName)
+    
+    return(annotated)
  
-def printLine(text,metadata,textId,metaDataId,preAnnotated):
+def printLine(text,metadata,textId,metaDataId,annotated):
     if metadata == None: 
         print("<td id=\""+metaDataId+"\"></td><td></td><td></td><td></td><td>")
     else:
-        if not metadata[IDFIELD] in preAnnotated: print("<tr>")
+        if not metadata[IDFIELD] in annotated: print("<tr>")
         else: print("<tr style=\"background-color:lightblue;\">")
         metadataText = ""
         for key in metadata: metadataText += " "+key+":"+metadata[key]
@@ -135,23 +149,23 @@ def printPageLinks(date,page):
     print("<a href=\""+SCRIPTURL+"?page={0:d}\">Next</a>".format(int(page)+1))
     return()
 
-def reorderTexts(metadata,texts,preAnnotated):
+def reorderTexts(metadata,texts,annotated):
     for i in range(0,len(metadata)):
-        if metadata[i][IDFIELD] in preAnnotated:
+        if metadata[i][IDFIELD] in annotated:
             for j in range(0,len(texts)):
                 if i != j and \
-                   preAnnotated[metadata[i][IDFIELD]]+":ocr" == texts[j]["id"]:
-                    # print("SWAPPING "+str(i)+" "+str(j)+" "+texts[j]["id"])
+                   annotated[metadata[i][IDFIELD]] == texts[j]["id"]:
+                    # print("<br>SWAPPING "+str(i)+" "+str(j)+" "+texts[j]["id"])
                     texts[i],texts[j] = texts[j],texts[i]
     return(texts)
 
-def printData(newspaper,date,page,texts,metadata,preAnnotated):
+def printData(newspaper,date,page,texts,metadata,annotated):
     maxIndex = max(len(texts),len(metadata))
     printPageLinks(date,page)
     print("<h2>"+newspaper+" "+date+" page "+page+"</h2>")
     print("<table>")
     print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Text</strong></td></tr>")
-    texts = reorderTexts(metadata,texts,preAnnotated)
+    texts = reorderTexts(metadata,texts,annotated)
     for i in range(0,maxIndex): 
         if i < len(texts): 
             text = texts[i]["text"]
@@ -165,20 +179,32 @@ def printData(newspaper,date,page,texts,metadata,preAnnotated):
         else: 
             metadatum = None
             metaDataId = str(i)
-        printLine(text,metadatum,textId,metaDataId,preAnnotated)
-    printLine(None,None,"div"+str(maxIndex),str(maxIndex),preAnnotated)
+        printLine(text,metadatum,textId,metaDataId,annotated)
+    printLine(None,None,"div"+str(maxIndex),str(maxIndex),annotated)
     print("</table>")
     return()
 
+def storeAnnotations(metadataId,textId):
+    try:
+        outFile = open(ANNOTATIONSFILE,"a")
+        outFile.write(str(metadataId)+SEPARATORTAB+str(textId)+"\n")
+        outFile.close()
+    except:
+        sys.exit(COMMAND+": problem processing file "+ANNOTATIONSFILE)
+    return()
+
 def main(argv):
+    cgitb.enable(logdir="/tmp")
+    cgiData = cgi.FieldStorage()
     print("Content-Type: text/html\n")
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
-    preAnnotated = readPreannotated()
-    cgitb.enable()
-    cgiData = cgi.FieldStorage()
+    if "textId" in cgiData and "metadataId" in cgiData:
+        storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
+    annotated = readAnnotations(PREANNOTATEDFILE,{})
+    annotated = readAnnotations(ANNOTATIONSFILE,annotated)
     year = str(YEAR)
     pageNbr = 1
-    if cgiData.has_key("page"): pageNbr = cgiData["page"].value
+    if "page" in cgiData: pageNbr = cgiData["page"].value
     month = str(MONTH)
     day = str(DAY)
     pageNbr = str(pageNbr)
@@ -190,12 +216,15 @@ def main(argv):
     if len(day) < 2: day = "0"+day
     date = year+month+day
     texts = readTexts(newspaper,date,pageNbr)
-    printData(newspaper,date,pageNbr,texts,metaData,preAnnotated)
+    printData(newspaper,date,pageNbr,texts,metaData,annotated)
     print("""
 <form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="post">
+<input type="hidden" name="textId">
+<input type="hidden" name="metadataId">
 </form>
 </body>
-</html>")
+</html>
+""")
     sys.exit(0)
 
 if __name__ == "__main__":
