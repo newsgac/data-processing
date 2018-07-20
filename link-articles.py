@@ -134,14 +134,15 @@ def printLine(text,metadata,textId,metaDataId,annotated):
     print('</td><td id="td'+metaDataId+'" ondrop="drop(event)" ondragover="allowDrop(event)"><div id="'+textId+'" draggable="true" ondragstart="drag(event)">')
     if text != None:
         shortText = text[0:80]
+        print(str(len(text)))
         print("<font title=\""+str(text)+"\">"+str(shortText)+"</font>")
     print("</div></td></tr>")
     return()
 
 def printPageLinks(date,page):
     print("<p>")
-    if int(page) > 1:
-        print("<a href=\""+SCRIPTURL+"?page={0:d}\">Prev</a>".format(int(page)-1))
+    if int(page) == 1: print("Prev")
+    else: print("<a href=\""+SCRIPTURL+"?page={0:d}\">Prev</a>".format(int(page)-1))
     print("<a href=\""+SCRIPTURL+"?page={0:d}\">Next</a>".format(int(page)+1))
     return()
 
