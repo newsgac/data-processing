@@ -1,11 +1,14 @@
-#!/usr/bin/python -W all
+#!/usr/local//bin/python3 -W all
 # link-articles.py: link meta data to newspaper article texts
 # usage: link-articles.py (via cgi)
 # 20180706 erikt(at)xs4all.nl
 
 import cgi
 import cgitb
+import codecs
 import csv
+import os
+import pwd
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -21,11 +24,11 @@ DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
 IDFIELD = "Artikel ID"
 KBIDFIELD = "KB-identifier"
-XMLDIR = "/var/www/data"
+XMLDIR = "/home/erikt/projects/newsgac/article-linking/data"
 OCRSUFFIX = ":ocr"
 METADATAFILE = XMLDIR+"/frank-dutch.csv"
 PREANNOTATEDFILE = XMLDIR+"/db.txt.org"
-ANNOTATIONSFILE = "/tmp"+"/annotations.tsv"
+ANNOTATIONSFILE = XMLDIR+"/annotations.tsv"
 SEPARATORCOMMA = ","
 SEPARATORTAB = "\t"
 SCRIPTURL = "http://localhost/cgi-bin/link-articles.py"
@@ -72,28 +75,23 @@ SCRIPTTEXT = """
 def readTexts(newspaper,date,page):
     texts = []
     xmlFileName = XMLDIR+"/"+newspaper+"-"+date+"-"+page+".xml"
-    print("<br>READ 1")
-#   try: 
-    print("<br>READ 2")
-    dataRoot = ET.parse(xmlFileName).getroot()
-    print("<br>READ 3")
-    for text in dataRoot:
-        textData = ""
-        for paragraph in text: textData += paragraph.text+" "
-        utfData = textData.encode("utf-8")
-        utfData = re.sub(r'"',"''",utfData)
-        texts.append({"text":utfData,"id":text.attrib["id"]})
-    print("<br>READ 4")
-    texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
-    print("<br>READ 5")
-#   except:
-#       print("<br>READ ERROR")
+    try: 
+        dataRoot = ET.parse(xmlFileName).getroot()
+        for text in dataRoot:
+            textData = ""
+            for paragraph in text: 
+                textData += paragraph.text
+            textData = re.sub(r'"',"''",textData)
+            texts.append({"text":textData,"id":text.attrib["id"]})
+        texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
+    except:
+        print("<br>READ ERROR")
     return(texts)
  
 def readMetaData(newspaper,date,page):
     dataOut = []
     try:
-        inFile = open(METADATAFILE,"r")
+        inFile = open(METADATAFILE,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA)
         for row in csvReader:
             if row[PAPERFIELD] == newspaper and \
@@ -107,7 +105,7 @@ def readMetaData(newspaper,date,page):
 def readAnnotations(fileName,preAnnotated):
     annotated = dict(preAnnotated)
     try: 
-        inFile = open(fileName,"r")
+        inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
             if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
@@ -116,7 +114,6 @@ def readAnnotations(fileName,preAnnotated):
                 annotated[row[IDFIELD]] = row[KBIDFIELD]
         inFile.close()
     except: sys.exit(COMMAND+": error processing file "+fileName)
-    
     return(annotated)
  
 def printLine(text,metadata,textId,metaDataId,annotated):
@@ -137,8 +134,7 @@ def printLine(text,metadata,textId,metaDataId,annotated):
     print('</td><td id="td'+metaDataId+'" ondrop="drop(event)" ondragover="allowDrop(event)"><div id="'+textId+'" draggable="true" ondragstart="drag(event)">')
     if text != None:
         shortText = text[0:80]
-        print(str(len(text)))
-        print("<font title=\""+text+"\">"+shortText+"</font>")
+        print("<font title=\""+str(text)+"\">"+str(shortText)+"</font>")
     print("</div></td></tr>")
     return()
 
@@ -194,6 +190,8 @@ def storeAnnotations(metadataId,textId):
     return()
 
 def main(argv):
+    # make sure stdout accepts utf data
+    sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf-8",buffering=1)
     cgitb.enable(logdir="/tmp")
     cgiData = cgi.FieldStorage()
     print("Content-Type: text/html\n")
