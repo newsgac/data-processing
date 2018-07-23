@@ -46,9 +46,11 @@ SCRIPTTEXT = """
     function drop(ev) {
         ev.preventDefault();
         var data = ev.dataTransfer.getData("text");
-        ev.target.appendChild(document.getElementById(data));
-        // document.getElementById(data).id
-        // ev.target.id)
+        var dropTarget = ev.target
+        while (dropTarget.tagName != "TD") {
+            dropTarget = dropTarget.parentElement
+        }
+        dropTarget.appendChild(document.getElementById(data));
     }
 
     function submitLine(el) {
@@ -57,15 +59,23 @@ SCRIPTTEXT = """
         for (var i = 0; i < tdElements.length; i++) {
             if (tdElements[i].id != "") {
                 divElements = tdElements[i].children;
+                textIds = ""
                 for (var j = 0; j < divElements.length; j++) {
                     if (divElements[j].id != "") {
-                        form = document.forms["saveAnnotation"];
-                        form.elements["textId"].value = divElements[j].id;
-                        form.elements["metadataId"].value = tdElements[i].id.slice(2);
-                        form.submit()
+                        if (textIds == "") {
+                            textIds = divElements[j].id;
+                        } else {
+                            textIds += " "+divElements[j].id;
+                        }
                     }
                 }
-                trElement.style.backgroundColor = "lightgreen"
+                if (textIds != "") {
+                    form = document.forms["saveAnnotation"];
+                    form.elements["textId"].value = textIds;
+                    form.elements["metadataId"].value = tdElements[i].id.slice(2);
+                    form.submit()
+                    trElement.style.backgroundColor = "lightblue"
+                }
             }
         }
     }
@@ -80,12 +90,11 @@ def readTexts(newspaper,date,page):
         for text in dataRoot:
             textData = ""
             for paragraph in text: 
-                textData += paragraph.text
+                textData += paragraph.text + " "
             textData = re.sub(r'"',"''",textData)
             texts.append({"text":textData,"id":text.attrib["id"]})
         texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
-    except:
-        print("<br>READ ERROR")
+    except: pass
     return(texts)
  
 def readMetaData(newspaper,date,page):
@@ -103,40 +112,45 @@ def readMetaData(newspaper,date,page):
     return(dataOut)
 
 def readAnnotations(fileName,preAnnotated):
-    annotated = dict(preAnnotated)
+    annotated = list(preAnnotated)
     try: 
         inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
             if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
-                if not re.search(OCRSUFFIX+"$",row[KBIDFIELD]):
-                    row[KBIDFIELD] += OCRSUFFIX
-                annotated[row[IDFIELD]] = row[KBIDFIELD]
+                annotated.append({"metadataId":row[IDFIELD],"textIds":row[KBIDFIELD]})
         inFile.close()
     except: sys.exit(COMMAND+": error processing file "+fileName)
     return(annotated)
  
-def printLine(text,metadata,textId,metaDataId,annotated):
-    if metadata == None: 
-        print("<td id=\""+metaDataId+"\"></td><td></td><td></td><td></td><td>")
+def printLine(texts,metadata,annotated,metadataIndex):
+    annotatedKeys = {}
+    for i in range(0,len(annotated)): 
+        annotatedKeys[annotated[i]["metadataId"]] = True
+    if metadataIndex >= len(metadata): 
+        print("<td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td>")
+        print("</td><td><div onclick=\"submitLine(this)\">#</div>")
+        print('</td><td id="td'+str(metadataIndex)+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
     else:
-        if not metadata[IDFIELD] in annotated: print("<tr>")
+        if not metadata[metadataIndex][IDFIELD] in annotatedKeys or len(texts[metadataIndex]) == 0: print("<tr>")
         else: print("<tr style=\"background-color:lightblue;\">")
         metadataText = ""
-        for key in metadata: metadataText += " "+key+":"+metadata[key]
-        # print("<td>"+metadata[IDFIELD])
-        print("<td>"+metadata["Soort Auteur"])
-        print("</td><td>"+metadata["Aard nieuws"])
-        print("</td><td>"+metadata["Genre"])
-        print("</td><td>"+metadata["Onderwerp"])
-        print('</td><td><font title="'+metadataText+'">'+metadata["Oppervlakte"]+"</font>")
-    print("</td><td><div onclick=\"submitLine(this)\">#</div>")
-    print('</td><td id="td'+metaDataId+'" ondrop="drop(event)" ondragover="allowDrop(event)"><div id="'+textId+'" draggable="true" ondragstart="drag(event)">')
-    if text != None:
-        shortText = text[0:80]
-        print(str(len(text)))
-        print("<font title=\""+str(text)+"\">"+str(shortText)+"</font>")
-    print("</div></td></tr>")
+        for key in metadata[metadataIndex]: metadataText += " "+key+":"+metadata[metadataIndex][key]
+        print("<td>"+metadata[metadataIndex]["Soort Auteur"])
+        print("</td><td>"+metadata[metadataIndex]["Aard nieuws"])
+        print("</td><td>"+metadata[metadataIndex]["Genre"])
+        print("</td><td>"+metadata[metadataIndex]["Onderwerp"])
+        print('</td><td><font title="'+metadataText+'">'+metadata[metadataIndex]["Oppervlakte"]+"</font>")
+        print("</td><td><div onclick=\"submitLine(this)\">#</div>")
+        print('</td><td id="td'+metadata[metadataIndex][IDFIELD]+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
+    if metadataIndex < len(texts) and len(texts[metadataIndex]) > 0:
+        for text in texts[metadataIndex]:
+            shortText = text["text"][0:80]
+            print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
+            print(str(len(text["text"])))
+            print("<font title=\""+str(text["text"])+"\">"+str(shortText)+"</font>")
+            print("</div>")
+    print("</td></tr>")
     return()
 
 def printPageLinks(date,page):
@@ -147,37 +161,43 @@ def printPageLinks(date,page):
     return()
 
 def reorderTexts(metadata,texts,annotated):
-    for i in range(0,len(metadata)):
-        if metadata[i][IDFIELD] in annotated:
+    for i in range(0,len(texts)): texts[i] = [texts[i]]
+    for i in range(len(texts),len(metadata)):
+        texts.append([])
+    metadataKeys = {}
+    for i in range(0,len(metadata)): metadataKeys[metadata[i][IDFIELD]] = i
+    for i in range(0,len(annotated)):
+        metadataKey = annotated[i]["metadataId"]
+        if metadataKey in metadataKeys:
+            metadataIndex = metadataKeys[metadataKey]
+            textIds = annotated[i]["textIds"]
+            targetIds = textIds.split(" ")
             for j in range(0,len(texts)):
-                if i != j and \
-                   annotated[metadata[i][IDFIELD]] == texts[j]["id"]:
-                    # print("<br>SWAPPING "+str(i)+" "+str(j)+" "+texts[j]["id"])
-                    texts[i],texts[j] = texts[j],texts[i]
+                for k in range(0,len(texts[j])):
+                    if metadataIndex != j and targetIds[0] == texts[j][k]["id"]:
+                        if len(texts[metadataIndex]) > 0 and len(texts[metadataIndex][0]) > 0:
+                            texts[j].extend(texts[metadataIndex])
+                        texts[metadataIndex] = [texts[j][k]]
+                        texts[j] = texts[j][0:k]+texts[j][k+1:]
+                        break
+            for t in range(1,len(targetIds)):
+                for j in range(0,len(texts)):
+                    for k in range(0,len(texts[j])):
+                        if metadataIndex != j and targetIds[t] == texts[j][k]["id"]:
+                            texts[metadataIndex].append(texts[j][k])
+                            texts[j] = texts[j][0:k]+texts[j][k+1:]
+                            break
     return(texts)
 
 def printData(newspaper,date,page,texts,metadata,annotated):
     maxIndex = max(len(texts),len(metadata))
-    printPageLinks(date,page)
     print("<h2>"+newspaper+" "+date+" page "+page+"</h2>")
     print("<table>")
     print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Text</strong></td></tr>")
     texts = reorderTexts(metadata,texts,annotated)
     for i in range(0,maxIndex): 
-        if i < len(texts): 
-            text = texts[i]["text"]
-            textId = texts[i]["id"]
-        else: 
-            text = None
-            textId = "div"+str(i)
-        if i < len(metadata): 
-            metadatum = metadata[i]
-            metaDataId = metadatum[IDFIELD]
-        else: 
-            metadatum = None
-            metaDataId = str(i)
-        printLine(text,metadatum,textId,metaDataId,annotated)
-    printLine(None,None,"div"+str(maxIndex),str(maxIndex),annotated)
+        printLine(texts,metadata,annotated,i)
+    printLine(texts,metadata,annotated,i+1)
     print("</table>")
     return()
 
@@ -197,35 +217,36 @@ def main(argv):
     cgiData = cgi.FieldStorage()
     print("Content-Type: text/html\n")
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
+    print("""
+<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="post">
+<input type="hidden" name="textId">
+<input type="hidden" name="metadataId">
+""")
     if "textId" in cgiData and "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
-    annotated = readAnnotations(PREANNOTATEDFILE,{})
+    annotated = readAnnotations(PREANNOTATEDFILE,[])
     annotated = readAnnotations(ANNOTATIONSFILE,annotated)
     year = str(YEAR)
     pageNbr = 1
     if "page" in cgiData: pageNbr = cgiData["page"].value
+    print('<input type="hidden" name="page" value="'+str(pageNbr)+'">\n</form>')
     month = str(MONTH)
     day = str(DAY)
     pageNbr = str(pageNbr)
     newspaper = NEWSPAPERMETA
     date = month+"/"+day+"/"+year
-    metaData = readMetaData(newspaper,date,pageNbr)
+    metadata = readMetaData(newspaper,date,pageNbr)
     newspaper = NEWSPAPERXML
     if len(month) < 2: month = "0"+month
     if len(day) < 2: day = "0"+day
     date = year+month+day
     texts = readTexts(newspaper,date,pageNbr)
-    printData(newspaper,date,pageNbr,texts,metaData,annotated)
-    print("""
-<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="post">
-<input type="hidden" name="textId">
-<input type="hidden" name="metadataId">
-</form>
-</body>
-</html>
-""")
+    printPageLinks(date,pageNbr)
+    if len(texts) > 0: 
+        printData(newspaper,date,pageNbr,texts,metadata,annotated)
+    else: print("<p>\nNo newspaper text found (metadata: "+str(len(metadata))+")\n")
+    print("</body>\n</html>")
     sys.exit(0)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
-
