@@ -19,6 +19,7 @@ MONTH = 1
 DAY = 2
 NEWSPAPERMETA = "05NRC Handelsblad"
 NEWSPAPERXML = "00Algemeen-Handelsblad"
+NEWSPAPERXML = "05NRC-Handelsblad"
 PAPERFIELD = "Titel krant"
 DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
@@ -31,7 +32,8 @@ PREANNOTATEDFILE = XMLDIR+"/db.txt.org"
 ANNOTATIONSFILE = XMLDIR+"/annotations.tsv"
 SEPARATORCOMMA = ","
 SEPARATORTAB = "\t"
-SCRIPTURL = "http://localhost/cgi-bin/link-articles.py"
+SCRIPTNAME = sys.argv[0].split("/")[-1]
+SCRIPTURL = "http://localhost/cgi-bin/"+SCRIPTNAME
 SCRIPTTEXT = """
 <script>
     //source: https://www.w3schools.com/HTML/html5_draganddrop.asp
@@ -94,22 +96,27 @@ def readTexts(newspaper,date,page):
             textData = re.sub(r'"',"''",textData)
             texts.append({"text":textData,"id":text.attrib["id"]})
         texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
-    except: pass
+    except: 
+        print("<p>Failed while reading file :"+xmlFileName)
     return(texts)
  
 def readMetaData(newspaper,date,page):
     dataOut = []
+    maxPages = {}
     try:
         inFile = open(METADATAFILE,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA)
         for row in csvReader:
             if row[PAPERFIELD] == newspaper and \
-               row[DATEFIELD] == date and \
-               row[PAGEFIELD] == page: dataOut.append(row)
+               row[DATEFIELD] == date:
+                if row[PAGEFIELD] == page: dataOut.append(row)
+                if not row[DATEFIELD] in maxPages or \
+                   int(row[PAGEFIELD]) > maxPages[row[DATEFIELD]]:
+                    maxPages[row[DATEFIELD]] = int(row[PAGEFIELD])
         dataOut = sorted(dataOut,key=lambda r: float(r["Oppervlakte"]),reverse=True)
         inFile.close()
     except: pass
-    return(dataOut)
+    return(dataOut,maxPages)
 
 def readAnnotations(fileName,preAnnotated):
     annotated = list(preAnnotated)
@@ -128,7 +135,7 @@ def printLine(texts,metadata,annotated,metadataIndex):
     for i in range(0,len(annotated)): 
         annotatedKeys[annotated[i]["metadataId"]] = True
     if metadataIndex >= len(metadata): 
-        print("<td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td>")
+        print("<tr><td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td>")
         print("</td><td><div onclick=\"submitLine(this)\">#</div>")
         print('</td><td id="td'+str(metadataIndex)+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
     else:
@@ -138,6 +145,7 @@ def printLine(texts,metadata,annotated,metadataIndex):
         for key in metadata[metadataIndex]: metadataText += " "+key+":"+metadata[metadataIndex][key]
         print("<td>"+metadata[metadataIndex]["Soort Auteur"])
         print("</td><td>"+metadata[metadataIndex]["Aard nieuws"])
+        metadata[metadataIndex]["Genre"] = re.sub(r"/"," ",metadata[metadataIndex]["Genre"])
         print("</td><td>"+metadata[metadataIndex]["Genre"])
         print("</td><td>"+metadata[metadataIndex]["Onderwerp"])
         print('</td><td><font title="'+metadataText+'">'+metadata[metadataIndex]["Oppervlakte"]+"</font>")
@@ -146,18 +154,13 @@ def printLine(texts,metadata,annotated,metadataIndex):
     if metadataIndex < len(texts) and len(texts[metadataIndex]) > 0:
         for text in texts[metadataIndex]:
             shortText = text["text"][0:80]
+            longText = text["text"][0:800]+" ### "+text["text"][-800:]
             print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
-            print(str(len(text["text"])))
-            print("<font title=\""+str(text["text"])+"\">"+str(shortText)+"</font>")
+            print("<font title=\""+longText+"\">")
+            print(str(len(text["text"]))+" ")
+            print(str(shortText)+"</font>")
             print("</div>")
     print("</td></tr>")
-    return()
-
-def printPageLinks(date,page):
-    print("<p>")
-    if int(page) == 1: print("Prev")
-    else: print("<a href=\""+SCRIPTURL+"?page={0:d}\">Prev</a>".format(int(page)-1))
-    print("<a href=\""+SCRIPTURL+"?page={0:d}\">Next</a>".format(int(page)+1))
     return()
 
 def reorderTexts(metadata,texts,annotated):
@@ -189,9 +192,9 @@ def reorderTexts(metadata,texts,annotated):
                             break
     return(texts)
 
-def printData(newspaper,date,page,texts,metadata,annotated):
+def printData(newspaper,date,page,texts,metadata,annotated,maxPages):
     maxIndex = max(len(texts),len(metadata))
-    print("<h2>"+newspaper+" "+date+" page "+page+"</h2>")
+    print("<h2>"+newspaper+" "+date+" page "+page+"/"+str(maxPages[metadata[0][DATEFIELD]])+"</h2>")
     print("<table>")
     print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Text</strong></td></tr>")
     texts = reorderTexts(metadata,texts,annotated)
@@ -217,33 +220,51 @@ def main(argv):
     cgiData = cgi.FieldStorage()
     print("Content-Type: text/html\n")
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
-    print("""
-<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="post">
-<input type="hidden" name="textId">
-<input type="hidden" name="metadataId">
-""")
     if "textId" in cgiData and "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
     annotated = readAnnotations(PREANNOTATEDFILE,[])
     annotated = readAnnotations(ANNOTATIONSFILE,annotated)
     year = str(YEAR)
-    pageNbr = 1
-    if "page" in cgiData: pageNbr = cgiData["page"].value
-    print('<input type="hidden" name="page" value="'+str(pageNbr)+'">\n</form>')
+    if "year" in cgiData: year = cgiData["year"].value
     month = str(MONTH)
+    if "month" in cgiData: month = cgiData["month"].value
     day = str(DAY)
+    if "day" in cgiData: day = cgiData["day"].value
+    pageNbr = 1
+    if "page" in cgiData:
+        if "prev" in cgiData: pageNbr = str(int(cgiData["page"].value)-1)
+        elif "next" in cgiData: pageNbr = str(int(cgiData["page"].value)+1)
+        else: pageNbr = cgiData["page"].value
+    print("""
+<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="put">
+<input type="hidden" name="textId">
+<input type="hidden" name="metadataId">
+""")
+    print('<input type="hidden" name="year" size="5" value="'+str(year)+'">')
+    print('<input type="hidden" name="month" size="5" value="'+str(month)+'">')
+    print('<input type="hidden" name="day" size="5" value="'+str(day)+'">')
+    print('<input type="hidden" name="page" value="'+str(pageNbr)+'">\n</form>')
+    print("""
+<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="put">
+""")
+    print('Year: <input type="text" name="year" size="5" value="'+str(year)+'">')
+    print('Month: <input type="text" name="month" size="2" value="'+str(month)+'">')
+    print('Day: <input type="text" name="day" size="2" value="'+str(day)+'">')
+    print('Page: <input type="text" name="page" size="2" value="'+str(pageNbr)+'">')
+    print('<input type="submit" name="submit" value="submit">')
+    print('<input type="submit" name="prev" value="prev">')
+    print('<input type="submit" name="next" value="next">\n</form>')
     pageNbr = str(pageNbr)
     newspaper = NEWSPAPERMETA
     date = month+"/"+day+"/"+year
-    metadata = readMetaData(newspaper,date,pageNbr)
+    metadata,maxPages = readMetaData(newspaper,date,pageNbr)
     newspaper = NEWSPAPERXML
     if len(month) < 2: month = "0"+month
     if len(day) < 2: day = "0"+day
     date = year+month+day
     texts = readTexts(newspaper,date,pageNbr)
-    printPageLinks(date,pageNbr)
     if len(texts) > 0: 
-        printData(newspaper,date,pageNbr,texts,metadata,annotated)
+        printData(newspaper,date,pageNbr,texts,metadata,annotated,maxPages)
     else: print("<p>\nNo newspaper text found (metadata: "+str(len(metadata))+")\n")
     print("</body>\n</html>")
     sys.exit(0)
