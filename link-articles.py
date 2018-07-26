@@ -110,9 +110,9 @@ def readMetaData(newspaper,date,page):
             if row[PAPERFIELD] == newspaper and \
                row[DATEFIELD] == date:
                 if row[PAGEFIELD] == page: dataOut.append(row)
-                if not row[DATEFIELD] in maxPages or \
-                   int(row[PAGEFIELD]) > maxPages[row[DATEFIELD]]:
-                    maxPages[row[DATEFIELD]] = int(row[PAGEFIELD])
+                if not date in maxPages or \
+                   int(row[PAGEFIELD]) > maxPages[date]:
+                    maxPages[date] = int(row[PAGEFIELD])
         dataOut = sorted(dataOut,key=lambda r: float(r["Oppervlakte"]),reverse=True)
         inFile.close()
     except: pass
@@ -155,10 +155,11 @@ def printLine(texts,metadata,annotated,metadataIndex):
         for text in texts[metadataIndex]:
             shortText = text["text"][0:80]
             longText = text["text"][0:800]+" ### "+text["text"][-800:]
+            thisId = text["id"].split(":")[4]
             print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
             print("<font title=\""+longText+"\">")
-            print(str(len(text["text"]))+" ")
-            print(str(shortText)+"</font>")
+            print(str(len(text["text"])),thisId,str(shortText))
+            print("</font>")
             print("</div>")
     print("</td></tr>")
     return()
@@ -192,11 +193,19 @@ def reorderTexts(metadata,texts,annotated):
                             break
     return(texts)
 
+def convertDate(date):
+    year = date[0:4]
+    month = str(int(date[4:6]))
+    day = str(int(date[6:8]))
+    dateSlash = month+"/"+day+"/"+year
+    return(dateSlash)
+
 def printData(newspaper,date,page,texts,metadata,annotated,maxPages):
     maxIndex = max(len(texts),len(metadata))
-    print("<h2>"+newspaper+" "+date+" page "+page+"/"+str(maxPages[metadata[0][DATEFIELD]])+"</h2>")
+    dateSlash = convertDate(date)
+    print("<h2>"+newspaper+" "+date+" page "+page+"/"+str(maxPages[dateSlash])+"</h2>")
     print("<table>")
-    print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Text</strong></td></tr>")
+    print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Id Text</strong></td></tr>")
     texts = reorderTexts(metadata,texts,annotated)
     for i in range(0,maxIndex): 
         printLine(texts,metadata,annotated,i)
@@ -262,8 +271,8 @@ def main(argv):
     if len(month) < 2: month = "0"+month
     if len(day) < 2: day = "0"+day
     date = year+month+day
-    texts = readTexts(newspaper,date,pageNbr)
-    if len(texts) > 0: 
+    texts = readTexts(newspaper,date,str(int(pageNbr)))
+    if len(texts) > 0 or len(metadata) > 0: 
         printData(newspaper,date,pageNbr,texts,metadata,annotated,maxPages)
     else: print("<p>\nNo newspaper text found (metadata: "+str(len(metadata))+")\n")
     print("</body>\n</html>")
