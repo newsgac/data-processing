@@ -14,11 +14,16 @@ import time
 from urllib.request import urlopen
 import xml.etree.ElementTree as ET
 
-ARTICLEURLPATH = "./{http://www.loc.gov/zing/srw/}records/{http://www.loc.gov/zing/srw/}record/{http://www.loc.gov/zing/srw/}recordData/{http://purl.org/dc/elements/1.1/}identifier"
+ARTICLEBASEPATH = "./{http://www.loc.gov/zing/srw/}records/{http://www.loc.gov/zing/srw/}record/{http://www.loc.gov/zing/srw/}recordData"
+ARTICLEURLPATH = "./{http://purl.org/dc/elements/1.1/}identifier"
+ARTICLETYPEPATH = "./{http://purl.org/dc/elements/1.1/}type"
+ARTICLE = "artikel"
+ILLUSTRATION = "illustratie met onderschrift"
 COMMAND = sys.argv.pop(0)
 MAXYEAR = 1995
 SEPARATOR = "\t"
 URLPREFIX = "http://jsru.kb.nl/sru/sru?query=type=artikel+and+page="
+URLPREFIX = "http://jsru.kb.nl/sru/sru?query=page="
 URLINFIX1 = "+and+date="
 URLINFIX2 = "+and+ppn="
 URLPOSTFIX = r"&x-collection=DDD_artikel"
@@ -74,8 +79,11 @@ def getArticleUrls(dateId):
     htmlData = getUrlData(url)
     root = ET.fromstring(htmlData)
     articleUrls = []
-    for articleUrl in root.findall(ARTICLEURLPATH):
-        articleUrls.append(articleUrl.text)
+    for article in root.findall(ARTICLEBASEPATH):
+        for articleUrl in article.findall(ARTICLEURLPATH):
+            articleType = article.findall(ARTICLETYPEPATH)[0]
+            if articleType.text == ARTICLE or articleType.text == ILLUSTRATION:
+                articleUrls.append(articleUrl.text)
     return(articleUrls)
 
 def getArticleTexts(articleUrls):
@@ -103,13 +111,17 @@ def storeArticleTexts(dateId,articleUrls,articleTexts):
 
 def main(argv):
     dateIds = readDBFile()
-    print(str(dateIds))
+    if len(argv) == 3:
+        dateIds[makeDateId(argv[0],argv[1],argv[2])] = True
     for dateId in dateIds:
         fileName = makeFileName(dateId)
         if not os.path.isfile(fileName):
+            print("Fetching",re.sub(r"\t",r"#",dateId),"...")
             articleUrls = getArticleUrls(dateId)
             articleTexts = getArticleTexts(articleUrls)
             storeArticleTexts(dateId,articleUrls,articleTexts)
+        else:
+            print(re.sub(r"\t",r"#",dateId),"is already in the text collection")
     return(0)
 
 if __name__ == "__main__":
