@@ -26,7 +26,7 @@ URLPREFIX = "http://jsru.kb.nl/sru/sru?query=type=artikel+and+page="
 URLPREFIX = "http://jsru.kb.nl/sru/sru?query=page="
 URLINFIX1 = "+and+date="
 URLINFIX2 = "+and+ppn="
-URLPOSTFIX = r"&x-collection=DDD_artikel"
+URLPOSTFIX = r"&x-collection=DDD_artikel&maximumRecords=100"
 
 ppns = { "00Algemeen Handelsblad":"400374129", 
          "05NRC Handelsblad":"400367629", 
