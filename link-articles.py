@@ -18,8 +18,8 @@ YEAR = 1965
 MONTH = 1
 DAY = 2
 NEWSPAPERMETA = "05NRC Handelsblad"
-NEWSPAPERXML = "00Algemeen-Handelsblad"
-NEWSPAPERXML = "05NRC-Handelsblad"
+NEWSPAPERXML1965 = "00Algemeen-Handelsblad"
+NEWSPAPERXML1985 = "05NRC-Handelsblad"
 PAPERFIELD = "Titel krant"
 DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
@@ -267,7 +267,8 @@ def main(argv):
     newspaper = NEWSPAPERMETA
     date = month+"/"+day+"/"+year
     metadata,maxPages = readMetaData(newspaper,date,pageNbr)
-    newspaper = NEWSPAPERXML
+    if year == "1965": newspaper = NEWSPAPERXML1965
+    else: newspaper = NEWSPAPERXML1985
     if len(month) < 2: month = "0"+month
     if len(day) < 2: day = "0"+day
     date = year+month+day
