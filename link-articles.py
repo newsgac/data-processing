@@ -25,6 +25,7 @@ DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
 IDFIELD = "Artikel ID"
 KBIDFIELD = "KB-identifier"
+TEXTIDSFIELD = "textIds"
 XMLDIR = "/home/erikt/projects/newsgac/article-linking/data"
 OCRSUFFIX = ":ocr"
 METADATAFILE = XMLDIR+"/frank-dutch.csv"
@@ -91,13 +92,14 @@ def readTexts(newspaper,date,page):
         dataRoot = ET.parse(xmlFileName).getroot()
         for text in dataRoot:
             textData = ""
-            for paragraph in text: 
-                textData += paragraph.text + " "
+            for paragraph in text:
+                if type(paragraph.text) == type("string"):
+                    textData += paragraph.text + " "
             textData = re.sub(r'"',"''",textData)
             texts.append({"text":textData,"id":text.attrib["id"]})
         texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
     except: 
-        print("<p>Failed while reading file :"+xmlFileName)
+        print("<p><font style=\"color:red\">Failed while reading file: "+xmlFileName+"</font>")
     return(texts)
  
 def readMetaData(newspaper,date,page):
@@ -118,28 +120,56 @@ def readMetaData(newspaper,date,page):
     except: pass
     return(dataOut,maxPages)
 
+def makeReverse(annotated):
+    reverse = {}
+    for thisKey in annotated:
+        for textId in annotated[thisKey]["textIds"].split():
+            if textId in reverse:
+                print("<p><font style=\"color:red;\">error: duplicate key "+thisKey)
+            reverse[textId] = thisKey
+    return(reverse)
+
+def removeLink(annotated,reverse,textId):
+    thisKey = reverse[textId]
+    textIds = annotated[thisKey][TEXTIDSFIELD].split()
+    index = textIds.index(textId)
+    textIds.pop(index)
+    del(reverse[textId])
+    if len(textIds) > 0:
+        annotated[thisKey][TEXTIDSFIELD] = " ".join(textIds)
+    else:
+        del(annotated[thisKey])
+    return(annotated,reverse)
+
 def readAnnotations(fileName,preAnnotated):
-    annotated = list(preAnnotated)
-    try: 
+    annotated = dict(preAnnotated)
+    reverse = makeReverse(annotated)
+    try:
         inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
             if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
-                annotated.append({"metadataId":row[IDFIELD],"textIds":row[KBIDFIELD]})
+                thisKey = row[IDFIELD]
+                textIds = row[KBIDFIELD]
+                for textId in textIds.split():
+                    if textId in reverse: annotated,reverse = removeLink(annotated,reverse,textId)
+                if thisKey in annotated:
+                    for textId in annotated[thisKey][TEXTIDSFIELD].split():
+                        annotated,reverse = removeLink(annotated,reverse,textId)
+                for textId in textIds.split(): reverse[textId] = thisKey
+                annotated[thisKey] = {TEXTIDSFIELD:textIds}
         inFile.close()
-    except: sys.exit(COMMAND+": error processing file "+fileName)
+    except Exception as e: 
+        sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
     return(annotated)
  
 def printLine(texts,metadata,annotated,metadataIndex):
-    annotatedKeys = {}
-    for i in range(0,len(annotated)): 
-        annotatedKeys[annotated[i]["metadataId"]] = True
     if metadataIndex >= len(metadata): 
         print("<tr><td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td>")
         print("</td><td><div onclick=\"submitLine(this)\">#</div>")
         print('</td><td id="td'+str(metadataIndex)+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
     else:
-        if not metadata[metadataIndex][IDFIELD] in annotatedKeys or len(texts[metadataIndex]) == 0: print("<tr>")
+        if not metadata[metadataIndex][IDFIELD] in annotated or len(texts[metadataIndex]) == 0: print("<tr>")
         else: print("<tr style=\"background-color:lightblue;\">")
         metadataText = ""
         for key in metadata[metadataIndex]: metadataText += " "+key+":"+metadata[metadataIndex][key]
@@ -170,11 +200,10 @@ def reorderTexts(metadata,texts,annotated):
         texts.append([])
     metadataKeys = {}
     for i in range(0,len(metadata)): metadataKeys[metadata[i][IDFIELD]] = i
-    for i in range(0,len(annotated)):
-        metadataKey = annotated[i]["metadataId"]
+    for metadataKey in annotated:
         if metadataKey in metadataKeys:
             metadataIndex = metadataKeys[metadataKey]
-            textIds = annotated[i]["textIds"]
+            textIds = annotated[metadataKey]["textIds"]
             targetIds = textIds.split(" ")
             for j in range(0,len(texts)):
                 for k in range(0,len(texts[j])):

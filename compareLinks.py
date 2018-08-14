@@ -20,87 +20,120 @@ PAGEFIELD = "Paginanummer"
 SURFACEFIELD = "Oppervlakte"
 TOPICFIELD = "Onderwerp"
 TEXTIDSFIELD = "textIds"
+LOCATIONSFIELD = "locations"
+SEPARATORCOMMA = ","
 SEPARATORTAB = "\t"
 OCRSUFFIX = r":ocr\b"
 EMPTYSTRING = ""
 
+def makeReverse(annotated):
+    reverse = {}
+    for thisKey in annotated:
+        for textId in annotated[thisKey]["textIds"].split():
+            if textId in reverse:
+                print("<p><font style=\"color:red;\">error: duplicate key "+thisKey)
+            reverse[textId] = thisKey
+    return(reverse)
+
+def removeLink(annotated,reverse,textId):
+    thisKey = reverse[textId]
+    textIds = annotated[thisKey][TEXTIDSFIELD].split()
+    index = textIds.index(textId)
+    textIds.pop(index)
+    del(reverse[textId])
+    if len(textIds) > 0:
+        annotated[thisKey][TEXTIDSFIELD] = " ".join(textIds)
+    else:
+        del(annotated[thisKey])
+    return(annotated,reverse)
+
 def readAnnotations(fileName,preAnnotated):
-    annotated = list(preAnnotated)
-    locations = {}
+    annotated = dict(preAnnotated)
+    reverse = makeReverse(annotated)
     try:
         inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
             if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
-                annotated.append({"metadataId":row[IDFIELD], \
-                                  "textIds":row[KBIDFIELD]})
-                if DATEFIELD in row:
-                    locations[row[IDFIELD]] = row[DATEFIELD]+" "+row[PAGEFIELD]
+                thisKey = row[IDFIELD]
+                textIds = row[KBIDFIELD]
+                for textId in textIds.split():
+                    if textId in reverse: annotated,reverse = removeLink(annotated,reverse,textId)
+                if thisKey in annotated:
+                    for textId in annotated[thisKey][TEXTIDSFIELD].split():
+                        annotated,reverse = removeLink(annotated,reverse,textId)
+                for textId in textIds.split(): reverse[textId] = thisKey
+                annotated[thisKey] = {TEXTIDSFIELD:textIds}
         inFile.close()
     except Exception as e: 
-        sys.exit(COMMAND+": error processing file "+fileName+": ",str(e))
-    return(annotated,locations)
+        sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
+    return(annotated)
+
+def readMetadata(fileName):
+    genres = {}
+    locations = {}
+    try:
+        inFile = open(fileName,"r",encoding="utf-8")
+        csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA)
+        for row in csvReader:
+            genres[row[IDFIELD]] = row[GENREFIELD]
+            locations[row[IDFIELD]] = row[DATEFIELD]+" "+row[PAGEFIELD]
+    except Exception as e:
+        sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
+    inFile.close()
+    return(genres,locations)
 
 def flatten(annotations):
     links = {}
-    genres = {}
-    metadataLinks = {}
-    for data in annotations:
-        metadataId = data[METADATAIDFIELD]
-        textIds = data[TEXTIDSFIELD]
-        if metadataId in metadataLinks:
-            for textId in metadataLinks[metadataId].split(): 
-                del(links[textId])
-            del(metadataLinks[metadataId])
+    for metadataId in annotations:
+        textIds = annotations[metadataId][TEXTIDSFIELD]
         for textId in textIds.split():
             textId = re.sub(OCRSUFFIX,EMPTYSTRING,textId)
-            if textId in links:
-                siblings = metadataLinks[links[textId]].split()
-                index = siblings.index(textId)
-                siblings = siblings[0:index]+siblings[(index+1):]
-                metadataLinks[links[textId]] = " ".join(siblings)
+            if textId in links: sys.exit(COMMAND+": cannot happen\n")
             links[textId] = metadataId
-        if GENREFIELD in data: genres[metadataId] = data[GENRE]
-        else: genres[metadataId] = EMPTYSTRING
-        metadataLinks[metadataId] = re.sub(OCRSUFFIX,EMPTYSTRING,textIds)
-    return(links,genres)
+    return(links)
 
-def compare(annotations1,annotations2,locations):
-    links1,genres1 = flatten(annotations1)
-    links2,genres2 = flatten(annotations2)
-    totalPairs1 = len(links1.keys())
-    totalPairs2 = len(links2.keys())
+def compare(annotations1,annotations2,locations,genres):
+    links1 = flatten(annotations1)
+    links2 = flatten(annotations2)
+    totalPairs1 = len(links1)
+    totalPairs2 = len(links2)
     totalEqualPairs = 0
     totalEqualGenres = 0
+    noLinks = 0
     for textId in links1:
-        if textId in links2:
+        if not textId in links2: noLinks += 1
+        else:
             if links2[textId] == links1[textId]:
                 totalEqualPairs += 1
             else: 
                 if links1[textId] in locations:
-                    print("link:",links1[textId],links2[textId],locations[links1[textId]],textId)
+                    print("article:",links1[textId],links2[textId],locations[links1[textId]],textId.split(":")[4])
                 else:
-                    print("link:",links1[textId],links2[textId],"LOC",textId)
-            if links2[textId] in genres1 and \
-               genres1[links2[textId]] == genres1[links1[textId]]:
-                totalEqualGenres += 1
-            else: 
-                if links1[textId] in locations:
-                    print("genre:",links1[textId],links2[textId],locations[links1[textId]],textId)
-                else:
-                    print("genre:",links1[textId],links2[textId],"LOC",textId)
-    return(totalPairs1,totalPairs2,totalEqualPairs,totalEqualGenres)
+                    print("article:",links1[textId],links2[textId],"LOC",textId.split(":")[4])
+            if links1[textId] in genres and links2[textId] in genres:
+                if genres[links1[textId]] == genres[links2[textId]]:
+                    totalEqualGenres += 1
+                else: 
+                    if links1[textId] in locations:
+                        print("genre:",links1[textId],links2[textId],locations[links1[textId]],textId.split(":")[4],genres[links1[textId]],genres[links2[textId]])
+                    else:
+                        print("genre:",links1[textId],links2[textId],"LOC",textId.split(":")[4],genres[links1[textId]],genres[links2[textId]])
+            elif links1[textId] in genres:
+                print("incomplete genre (1):",links1[textId],links2[textId],textId,genres[links1[textId]])
+            elif links2[textId] in genres:
+                print("incomplete genre (2):",links1[textId],links2[textId],textId,genres[links2[textId]])
+    return(totalPairs1,totalPairs2,totalEqualPairs,totalEqualGenres,noLinks)
 
 def main(argv):
-    try: fileName1,fileName2 = argv
+    try: annotationFile1,annotationFile2,metadataFile = argv
     except: sys.exit("usage:",COMMAND,"file1 file2")
-    annotations1,locations1 = readAnnotations(fileName1,[])
-    annotations2,locations2 = readAnnotations(fileName2,[])
-    if len(locations1) > 0: locations = locations1
-    else: locations = locations2
-    totalPairs1,totalPairs2,totalEqualPairs,totalEqualGenres = \
-        compare(annotations1,annotations2,locations)
-    print("size file 1:",totalPairs1,"size file2:",totalPairs2,"article agreement:",totalEqualPairs,"genre agreement:",totalEqualGenres)
+    annotations1 = readAnnotations(annotationFile1,[])
+    annotations2 = readAnnotations(annotationFile2,[])
+    genres,locations = readMetadata(metadataFile)
+    totalPairs1,totalPairs2,totalEqualPairs,totalEqualGenres,noLinks = \
+        compare(annotations1,annotations2,locations,genres)
+    print("size file 1:",totalPairs1,"size file2:",totalPairs2,"article agreement:",totalEqualPairs,"genre agreement:",totalEqualGenres,"no links:",noLinks)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
