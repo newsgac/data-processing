@@ -102,7 +102,9 @@ def compare(annotations1,annotations2,locations,genres):
     totalEqualGenres = 0
     noLinks = 0
     for textId in links1:
-        if not textId in links2: noLinks += 1
+        if not textId in links2: 
+            noLinks += 1
+            print("no link: ",links1[textId],"-",locations[links1[textId]],textId.split(":")[4])
         else:
             if links2[textId] == links1[textId]:
                 totalEqualPairs += 1
