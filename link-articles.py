@@ -72,13 +72,11 @@ SCRIPTTEXT = """
                         }
                     }
                 }
-                if (textIds != "") {
-                    form = document.forms["saveAnnotation"];
-                    form.elements["textId"].value = textIds;
-                    form.elements["metadataId"].value = tdElements[i].id.slice(2);
-                    form.submit()
-                    trElement.style.backgroundColor = "lightblue"
-                }
+                form = document.forms["saveAnnotation"];
+                form.elements["textId"].value = textIds;
+                form.elements["metadataId"].value = tdElements[i].id.slice(2);
+                form.submit()
+                trElement.style.backgroundColor = "lightblue"
             }
         }
     }
@@ -97,7 +95,7 @@ def readTexts(newspaper,date,page):
                     textData += paragraph.text + " "
             textData = re.sub(r'"',"''",textData)
             texts.append({"text":textData,"id":text.attrib["id"]})
-        texts = sorted(texts,key=lambda s: len(s["text"]),reverse=True)
+        texts = sorted(texts,key=lambda s: s["id"])
     except: 
         print("<p><font style=\"color:red\">Failed while reading file: "+xmlFileName+"</font>")
     return(texts)
@@ -115,7 +113,7 @@ def readMetaData(newspaper,date,page):
                 if not date in maxPages or \
                    int(row[PAGEFIELD]) > maxPages[date]:
                     maxPages[date] = int(row[PAGEFIELD])
-        dataOut = sorted(dataOut,key=lambda r: float(r["Oppervlakte"]),reverse=True)
+        dataOut = sorted(dataOut,key=lambda r: float(r["Invoernummer"]))
         inFile.close()
     except: pass
     return(dataOut,maxPages)
@@ -148,16 +146,18 @@ def readAnnotations(fileName,preAnnotated):
         inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
-            if KBIDFIELD in row and IDFIELD in row and row[KBIDFIELD] != "":
+            if IDFIELD in row:
                 thisKey = row[IDFIELD]
-                textIds = row[KBIDFIELD]
+                if KBIDFIELD in row: textIds = row[KBIDFIELD]
+                else: textIds = ""
                 for textId in textIds.split():
                     if textId in reverse: annotated,reverse = removeLink(annotated,reverse,textId)
                 if thisKey in annotated:
                     for textId in annotated[thisKey][TEXTIDSFIELD].split():
                         annotated,reverse = removeLink(annotated,reverse,textId)
                 for textId in textIds.split(): reverse[textId] = thisKey
-                annotated[thisKey] = {TEXTIDSFIELD:textIds}
+                if textIds != "": 
+                    annotated[thisKey] = {TEXTIDSFIELD:textIds}
         inFile.close()
     except Exception as e: 
         sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
@@ -165,11 +165,11 @@ def readAnnotations(fileName,preAnnotated):
  
 def printLine(texts,metadata,annotated,metadataIndex):
     if metadataIndex >= len(metadata): 
-        print("<tr><td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td>")
+        print("<tr><td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td></td><td>")
         print("</td><td><div onclick=\"submitLine(this)\">#</div>")
         print('</td><td id="td'+str(metadataIndex)+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
     else:
-        if not metadata[metadataIndex][IDFIELD] in annotated or len(texts[metadataIndex]) == 0: print("<tr>")
+        if not metadata[metadataIndex][IDFIELD] in annotated: print("<tr>")
         else: print("<tr style=\"background-color:lightblue;\">")
         metadataText = ""
         for key in metadata[metadataIndex]: metadataText += " "+key+":"+metadata[metadataIndex][key]
@@ -178,19 +178,24 @@ def printLine(texts,metadata,annotated,metadataIndex):
         metadata[metadataIndex]["Genre"] = re.sub(r"/"," ",metadata[metadataIndex]["Genre"])
         print("</td><td>"+metadata[metadataIndex]["Genre"])
         print("</td><td>"+metadata[metadataIndex]["Onderwerp"])
+        print("</td><td>"+metadata[metadataIndex]["Invoernummer"])
         print('</td><td><font title="'+metadataText+'">'+metadata[metadataIndex]["Oppervlakte"]+"</font>")
         print("</td><td><div onclick=\"submitLine(this)\">#</div>")
         print('</td><td id="td'+metadata[metadataIndex][IDFIELD]+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
-    if metadataIndex < len(texts) and len(texts[metadataIndex]) > 0:
-        for text in texts[metadataIndex]:
-            shortText = text["text"][0:80]
-            longText = text["text"][0:800]+" ### "+text["text"][-800:]
-            thisId = text["id"].split(":")[4]
-            print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
-            print("<font title=\""+longText+"\">")
-            print(str(len(text["text"])),thisId,str(shortText))
-            print("</font>")
-            print("</div>")
+    if metadataIndex < len(texts) and metadata[metadataIndex][IDFIELD] in annotated:
+        if len(texts[metadataIndex]) <= 0:
+            for link in annotated[metadata[metadataIndex][IDFIELD]][TEXTIDSFIELD].split():
+                print("<a href=\""+link+"\">"+link+"</a> ")
+        else:
+            for text in texts[metadataIndex]:
+                shortText = text["text"][0:80]
+                longText = text["text"][0:800]+" ### "+text["text"][-800:]
+                thisId = text["id"].split(":")[4]
+                print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
+                print("<font title=\""+longText+"\">")
+                print(str(len(text["text"])),thisId,str(shortText))
+                print("</font>")
+                print("</div>")
     print("</td></tr>")
     return()
 
@@ -234,7 +239,7 @@ def printData(newspaper,date,page,texts,metadata,annotated,maxPages):
     dateSlash = convertDate(date)
     print("<h2>"+newspaper+" "+date+" page "+page+"/"+str(maxPages[dateSlash])+"</h2>")
     print("<table>")
-    print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Surface</strong></td><td></td><td><strong>Chars Id Text</strong></td></tr>")
+    print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Nr</strong><td><strong>Surface</strong></td><td></td><td><strong>Chars Id Text</strong></td></tr>")
     texts = reorderTexts(metadata,texts,annotated)
     for i in range(0,maxIndex): 
         printLine(texts,metadata,annotated,i)
@@ -260,6 +265,8 @@ def main(argv):
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
     if "textId" in cgiData and "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
+    elif "metadataId" in cgiData:
+        storeAnnotations(cgiData["metadataId"].value,"")
     annotated = readAnnotations(PREANNOTATEDFILE,[])
     annotated = readAnnotations(ANNOTATIONSFILE,annotated)
     year = str(YEAR)
