@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 ARTICLEBASEPATH = "./{http://www.loc.gov/zing/srw/}records/{http://www.loc.gov/zing/srw/}record/{http://www.loc.gov/zing/srw/}recordData"
 ARTICLEURLPATH = "./{http://purl.org/dc/elements/1.1/}identifier"
 ARTICLETYPEPATH = "./{http://purl.org/dc/elements/1.1/}type"
+AD = "advertentie"
 ARTICLE = "artikel"
 ILLUSTRATION = "illustratie met onderschrift"
 COMMAND = sys.argv.pop(0)
@@ -82,7 +83,7 @@ def getArticleUrls(dateId):
     for article in root.findall(ARTICLEBASEPATH):
         for articleUrl in article.findall(ARTICLEURLPATH):
             articleType = article.findall(ARTICLETYPEPATH)[0]
-            if articleType.text == ARTICLE or articleType.text == ILLUSTRATION:
+            if articleType.text != AD:
                 articleUrls.append(articleUrl.text)
     return(articleUrls)
 
