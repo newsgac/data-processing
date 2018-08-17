@@ -163,6 +163,17 @@ def readAnnotations(fileName,preAnnotated):
         sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
     return(annotated)
  
+def printText(text):
+    shortText = text["text"][0:80]
+    longText = text["text"][0:800]+" ### "+text["text"][-800:]
+    thisId = text["id"].split(":")[4]
+    print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
+    print("<font title=\""+longText+"\">")
+    print(str(len(text["text"])),thisId,str(shortText))
+    print("</font>")
+    print("</div>")
+    return()
+
 def printLine(texts,metadata,annotated,metadataIndex):
     if metadataIndex >= len(metadata): 
         print("<tr><td id=\""+str(metadataIndex)+"\"></td><td></td><td></td><td></td><td></td><td>")
@@ -182,20 +193,21 @@ def printLine(texts,metadata,annotated,metadataIndex):
         print('</td><td><font title="'+metadataText+'">'+metadata[metadataIndex]["Oppervlakte"]+"</font>")
         print("</td><td><div onclick=\"submitLine(this)\">#</div>")
         print('</td><td id="td'+metadata[metadataIndex][IDFIELD]+'" ondrop="drop(event)" ondragover="allowDrop(event)">')
-    if metadataIndex < len(texts) and metadata[metadataIndex][IDFIELD] in annotated:
-        if len(texts[metadataIndex]) <= 0:
+    if metadataIndex < len(texts) or \
+       (metadataIndex < len(metadata) and metadata[metadataIndex][IDFIELD] in annotated):
+        if metadataIndex < len(metadata) and metadata[metadataIndex][IDFIELD] in annotated:
             for link in annotated[metadata[metadataIndex][IDFIELD]][TEXTIDSFIELD].split():
-                print("<a href=\""+link+"\">"+link+"</a> ")
+                textId = -1
+                for i in range(0,len(texts[metadataIndex])):
+                    if texts[metadataIndex][i]["id"] == link: textId = i
+                if textId >= 0: printText(texts[metadataIndex][textId])
+                else: print("<a href=\""+link+"\">"+link+"</a> ")
         else:
-            for text in texts[metadataIndex]:
-                shortText = text["text"][0:80]
-                longText = text["text"][0:800]+" ### "+text["text"][-800:]
-                thisId = text["id"].split(":")[4]
-                print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
-                print("<font title=\""+longText+"\">")
-                print(str(len(text["text"])),thisId,str(shortText))
-                print("</font>")
-                print("</div>")
+            if len(texts[metadataIndex]) > 0:
+                for text in texts[metadataIndex]: printText(text)
+            elif metadataIndex < len(metadata):
+                print("<font style=\"color:grey\">"+metadata[metadataIndex]["Artikel ID"]+"</font>")
+
     print("</td></tr>")
     return()
 
