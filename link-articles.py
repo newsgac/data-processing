@@ -54,6 +54,12 @@ SCRIPTTEXT = """
             dropTarget = dropTarget.parentElement
         }
         dropTarget.appendChild(document.getElementById(data));
+        children = dropTarget.childNodes;
+        for (var i=0;i<children.length;i++) {
+            if (children[i].id == "metadataId") {
+                dropTarget.removeChild(children[i]); 
+            }
+        }
     }
 
     function submitLine(el) {
@@ -206,7 +212,7 @@ def printLine(texts,metadata,annotated,metadataIndex):
             if len(texts[metadataIndex]) > 0:
                 for text in texts[metadataIndex]: printText(text)
             elif metadataIndex < len(metadata):
-                print("<font style=\"color:grey\">"+metadata[metadataIndex]["Artikel ID"]+"</font>")
+                print("<div id=\"metadataId\"><font style=\"color:grey\">"+metadata[metadataIndex]["Artikel ID"]+"</font></div>")
 
     print("</td></tr>")
     return()
