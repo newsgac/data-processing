@@ -78,7 +78,7 @@ SCRIPTTEXT = """
                         }
                     }
                 }
-                form = document.forms["saveAnnotation"];
+                form = document.forms["saveAnnotation1"];
                 form.elements["textId"].value = textIds;
                 form.elements["metadataId"].value = tdElements[i].id.slice(2);
                 form.submit()
@@ -243,6 +243,29 @@ def reorderTexts(metadata,texts,annotated):
                             texts[metadataIndex].append(texts[j][k])
                             texts[j] = texts[j][0:k]+texts[j][k+1:]
                             break
+    metadataIds = {}
+    for i in range(0,len(texts)):
+        for j in range(0,len(texts[i])):
+            thisId = texts[i][j]["id"].split(":")[-2]
+            metadataIds[thisId] = i
+    sortedTextIds = sorted(metadataIds.keys())
+    for i in range(1,len(sortedTextIds)):
+        thisTextId = sortedTextIds[i]
+        lastTextId = sortedTextIds[i-1]
+        if metadataIds[thisTextId] < len(metadata) and \
+           not metadata[metadataIds[thisTextId]][IDFIELD] in annotated:
+            nextMetaDataId = metadataIds[lastTextId]+1
+            while nextMetaDataId < len(metadata) and \
+                  IDFIELD in metadata[nextMetaDataId] and \
+                  metadata[nextMetaDataId][IDFIELD] in annotated:
+                nextMetaDataId += 1
+            while nextMetaDataId >= len(texts): texts.append([])
+            texts[metadataIds[thisTextId]],texts[nextMetaDataId] = \
+                texts[nextMetaDataId],texts[metadataIds[thisTextId]]
+            for mId in metadataIds.keys():
+                if metadataIds[mId] == nextMetaDataId:
+                    metadataIds[mId] = metadataIds[thisTextId]
+            metadataIds[thisTextId] = nextMetaDataId
     return(texts)
 
 def convertDate(date):
@@ -298,22 +321,26 @@ def main(argv):
         if "prev" in cgiData: pageNbr = str(int(cgiData["page"].value)-1)
         elif "next" in cgiData: pageNbr = str(int(cgiData["page"].value)+1)
         else: pageNbr = cgiData["page"].value
+    offset = 0
+    if "offset" in cgiData: offset = int(cgiData["offset"].value)
     print("""
-<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="put">
+<form id="saveAnnotation1" action="/cgi-bin/link-articles.py" method="put">
 <input type="hidden" name="textId">
 <input type="hidden" name="metadataId">
 """)
     print('<input type="hidden" name="year" size="5" value="'+str(year)+'">')
     print('<input type="hidden" name="month" size="5" value="'+str(month)+'">')
     print('<input type="hidden" name="day" size="5" value="'+str(day)+'">')
-    print('<input type="hidden" name="page" value="'+str(pageNbr)+'">\n</form>')
+    print('<input type="hidden" name="page" value="'+str(pageNbr)+'">')
+    print('<input type="hidden" name="offset" value="'+str(offset)+'">\n</form>')
     print("""
-<form id="saveAnnotation" action="/cgi-bin/link-articles.py" method="put">
+<form id="saveAnnotation2" action="/cgi-bin/link-articles.py" method="put">
 """)
     print('Year: <input type="text" name="year" size="5" value="'+str(year)+'">')
     print('Month: <input type="text" name="month" size="2" value="'+str(month)+'">')
     print('Day: <input type="text" name="day" size="2" value="'+str(day)+'">')
     print('Page: <input type="text" name="page" size="2" value="'+str(pageNbr)+'">')
+    print('Offset: <input type="text" name="offset" size="1" value="'+str(offset)+'">')
     print('<input type="submit" name="submit" value="submit">')
     print('<input type="submit" name="prev" value="prev">')
     print('<input type="submit" name="next" value="next">\n</form>')
@@ -326,7 +353,7 @@ def main(argv):
     if len(month) < 2: month = "0"+month
     if len(day) < 2: day = "0"+day
     date = year+month+day
-    texts = readTexts(newspaper,date,str(int(pageNbr)))
+    texts = readTexts(newspaper,date,str(int(pageNbr)+offset))
     if len(texts) > 0 or len(metadata) > 0: 
         printData(newspaper,date,pageNbr,texts,metadata,annotated,maxPages)
     else: print("<p>\nNo newspaper text found (metadata: "+str(len(metadata))+")\n")
