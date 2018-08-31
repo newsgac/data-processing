@@ -17,12 +17,9 @@ from io import BytesIO
 from urllib.request import urlopen
 
 COMMAND = sys.argv.pop(0)
-HEADINGDATE = "Date"
+HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
-HEADINGIDENTIFIER = "Artikel-ID"
-INDEXDATE = 0
-INDEXGENRE = 3
-INDEXIDENTIFIER = 5
+HEADINGIDENTIFIER = "Identifier"
 INSECUREURL = r"^http:"
 LABELLENGTH = 3
 LABELPREFIX = "__label__"
@@ -34,16 +31,14 @@ URLSUFFIX = ":ocr"
 def readFile():
     articles = []
     lineNbr = 0
-    csvReader = csv.reader(sys.stdin,delimiter=SEPARATOR)
-    next(csvReader)
+    csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
     for row in csvReader:
         lineNbr += 1
+        print(row)
         try:
-            date = row[INDEXDATE]
-            genre = row[INDEXGENRE]
-            identifier = row[INDEXIDENTIFIER]
-            for i in range(INDEXIDENTIFIER+1,len(row)):
-                if isUrl(row[i]): identifier +=  " "+row[i]
+            date = row[HEADINGDATE]
+            genre = row[HEADINGGENRE]
+            identifier = row[HEADINGIDENTIFIER]
             articles.append({"date":date,"genre":genre,"identifier":identifier})
         except: sys.exit(COMMAND+": missing data on line "+str(lineNbr))
     return(articles)
