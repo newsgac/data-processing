@@ -23,8 +23,10 @@ NEWSPAPERXML1985 = "05NRC-Handelsblad"
 PAPERFIELD = "Titel krant"
 DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
+GENREFIELD = "Genre"
 IDFIELD = "Artikel ID"
 KBIDFIELD = "KB-identifier"
+IDENTIFIERFIELD = "Identifier"
 TEXTIDSFIELD = "textIds"
 XMLDIR = "/home/erikt/projects/newsgac/article-linking/data"
 OCRSUFFIX = ":ocr"
@@ -123,6 +125,17 @@ def readMetaData(newspaper,date,page):
         inFile.close()
     except: pass
     return(dataOut,maxPages)
+
+def readMetaDataIds(ids):
+    dataOut = {}
+    try:
+        inFile = open(METADATAFILE,"r",encoding="utf-8")
+        csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA)
+        for row in csvReader:
+            if row[IDFIELD] in ids: dataOut[row[IDFIELD]] = row
+        inFile.close()
+    except: pass
+    return(dataOut)
 
 def makeReverse(annotated):
     reverse = {}
@@ -298,19 +311,30 @@ def storeAnnotations(metadataId,textId):
         sys.exit(COMMAND+": problem processing file "+ANNOTATIONSFILE)
     return()
 
+def printAnnotated(annotated):
+    metadata = readMetaDataIds(annotated)
+    csvwriter = csv.DictWriter(sys.stdout,fieldnames=[IDFIELD,DATEFIELD,GENREFIELD,IDENTIFIERFIELD])
+    csvwriter.writeheader()
+    for thisKey in annotated:
+        csvwriter.writerow({IDFIELD:thisKey,DATEFIELD:metadata[thisKey][DATEFIELD],GENREFIELD:metadata[thisKey][GENREFIELD],IDENTIFIERFIELD:annotated[thisKey]["textIds"]})
+    sys.exit(0)
+
 def main(argv):
-    # make sure stdout accepts utf data
-    sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf-8",buffering=1)
-    cgitb.enable(logdir="/tmp")
+#   cgitb.enable(logdir="/tmp")
     cgiData = cgi.FieldStorage()
-    print("Content-Type: text/html\n")
-    print("<html><head>"+SCRIPTTEXT+"</head><body>")
     if "textId" in cgiData and "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
     elif "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,"")
     annotated = readAnnotations(PREANNOTATEDFILE,[])
     annotated = readAnnotations(ANNOTATIONSFILE,annotated)
+    if len(argv) > 1: printAnnotated(annotated)
+
+    # make sure stdout accepts utf data
+    sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf-8",buffering=1)
+    print("Content-Type: text/html\n")
+    print("<html><head>"+SCRIPTTEXT+"</head><body>")
+
     year = str(YEAR)
     if "year" in cgiData: year = cgiData["year"].value
     month = str(MONTH)
@@ -359,7 +383,7 @@ def main(argv):
         printData(newspaper,date,pageNbr,texts,metadata,annotated,maxPages)
     else: print("<p>\nNo newspaper text found (metadata: "+str(len(metadata))+")\n")
     print("</body>\n</html>")
-    sys.exit(0)
+    sys.stdout.close()
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
