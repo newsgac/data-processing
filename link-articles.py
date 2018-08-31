@@ -252,7 +252,7 @@ def reorderTexts(metadata,texts,annotated):
     for i in range(1,len(sortedTextIds)):
         thisTextId = sortedTextIds[i]
         lastTextId = sortedTextIds[i-1]
-        if metadataIds[thisTextId] < len(metadata) and \
+        if metadataIds[thisTextId] >= len(metadata) or \
            not metadata[metadataIds[thisTextId]][IDFIELD] in annotated:
             nextMetaDataId = metadataIds[lastTextId]+1
             while nextMetaDataId < len(metadata) and \
@@ -276,14 +276,15 @@ def convertDate(date):
     return(dateSlash)
 
 def printData(newspaper,date,page,texts,metadata,annotated,maxPages):
-    maxIndex = max(len(texts),len(metadata))
     dateSlash = convertDate(date)
     print("<h2>"+newspaper+" "+date+" page "+page+"/"+str(maxPages[dateSlash])+"</h2>")
     print("<table>")
     print("<tr><td><strong>Author</strong></td><td><strong>Type of news</strong></td><td><strong>Genre</strong></td><td><strong>Topic</strong></td><td><strong>Nr</strong><td><strong>Surface</strong></td><td></td><td><strong>Chars Id Text</strong></td></tr>")
     texts = reorderTexts(metadata,texts,annotated)
-    for i in range(0,maxIndex): 
-        printLine(texts,metadata,annotated,i)
+    maxIndex = max(len(texts),len(metadata))
+    for i in range(0,maxIndex):
+        if i < len(metadata) or len(texts[i]) > 0:
+            printLine(texts,metadata,annotated,i)
     printLine(texts,metadata,annotated,i+1)
     print("</table>")
     return()
