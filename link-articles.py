@@ -17,9 +17,7 @@ COMMAND = sys.argv[0]
 YEAR = 1965
 MONTH = 1
 DAY = 2
-NEWSPAPERMETA = "05NRC Handelsblad"
-NEWSPAPERXML1965 = "00Algemeen-Handelsblad"
-NEWSPAPERXML1985 = "05NRC-Handelsblad"
+NEWSPAPER = "volkskrant"
 PAPERFIELD = "Titel krant"
 DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
@@ -320,7 +318,7 @@ def printAnnotated(annotated):
     sys.exit(0)
 
 def main(argv):
-#   cgitb.enable(logdir="/tmp")
+    cgitb.enable(logdir="/tmp")
     cgiData = cgi.FieldStorage()
     if "textId" in cgiData and "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
@@ -334,6 +332,22 @@ def main(argv):
     sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf-8",buffering=1)
     print("Content-Type: text/html\n")
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
+
+    newspaper = str(NEWSPAPER)
+    if "newspaper" in cgiData: newspaper = cgiData["newspaper"].value.lower()
+    if newspaper == "volkskrant":
+        NEWSPAPERMETA = "08De Volkskrant"
+        NEWSPAPERXML1965 = "08De-Volkskrant"
+        NEWSPAPERXML1985 = "08De-Volkskrant"
+    elif newspaper == "nrc":
+        NEWSPAPERMETA = "05NRC Handelsblad"
+        NEWSPAPERXML1965 = "00Algemeen-Handelsblad"
+        NEWSPAPERXML1985 = "05NRC-Handelsblad"
+    elif newspaper == "telegraaf":
+        NEWSPAPERMETA = "06De Telegraaf"
+        NEWSPAPERXML1965 = "06De-Telegraaf"
+        NEWSPAPERXML1985 = "06De-Telegraaf"
+    else: sys.exit("unknown newspaper")
 
     year = str(YEAR)
     if "year" in cgiData: year = cgiData["year"].value
@@ -361,6 +375,7 @@ def main(argv):
     print("""
 <form id="saveAnnotation2" action="/cgi-bin/link-articles.py" method="put">
 """)
+    print('Newspaper: <input type="newspaper" size="7" name="newspaper" value="'+str(newspaper)+'">')
     print('Year: <input type="text" name="year" size="5" value="'+str(year)+'">')
     print('Month: <input type="text" name="month" size="2" value="'+str(month)+'">')
     print('Day: <input type="text" name="day" size="2" value="'+str(day)+'">')
