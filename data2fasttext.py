@@ -2,7 +2,7 @@
 """
     data2fasttext.py: convert NEWSGAC data format to fasttext format
     usage: ./data2fasttext.py < file
-    notes: expects comma-separated file with fields Genre Identifier Date Artikel-ID
+    notes: expects comma-separated file with fields Genre Identifier Date
     20171120 erikt(at)xs4all.nl
 """
 
@@ -34,7 +34,6 @@ def readFile():
     csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
     for row in csvReader:
         lineNbr += 1
-        print(row)
         try:
             date = row[HEADINGDATE]
             genre = row[HEADINGGENRE]
@@ -48,7 +47,12 @@ def abbreviateName(name):
 
 def readWebPage(url):
     time.sleep(1)
-    return(str(urlopen(url,data=None).read(),encoding="utf-8"))
+    try:
+        text = str(urlopen(url,data=None).read(),encoding="utf-8")
+        return(text)
+    except Exception as e:
+        print(COMMAND+": problem retrieving url: "+url+" "+str(e),file=sys.stderr)
+        return("( geen tekst beschikbaar )")
 
 def removeXML(text):
     text = re.sub(r"<[^<>]*>",r" ",text)
