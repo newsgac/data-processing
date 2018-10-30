@@ -12,6 +12,7 @@ import nltk
 import re
 import sys
 import time
+from datetime import datetime
 
 from io import BytesIO
 from urllib.request import urlopen
@@ -28,18 +29,32 @@ SEPARATOR = ","
 URLPREFIX = r"http"
 URLSUFFIX = ":ocr"
 
+def standardizeDate(dateString):
+    try: date = datetime.strptime(dateString,"%d-%m-%Y")
+    except Exceptions as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
+    return(date.strftime("%m/%d/%Y"))
+
 def readFile():
     articles = []
     lineNbr = 0
     csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
     for row in csvReader:
         lineNbr += 1
+<<<<<<< HEAD
+        #try:
+        date = standardizeDate(row[HEADINGDATE])
+        genre = row[HEADINGGENRE]
+        identifier = row[HEADINGIDENTIFIER]
+        articles.append({"date":date,"genre":genre,"identifier":identifier})
+        #except: sys.exit(COMMAND+": missing data on line "+str(lineNbr))
+=======
         try:
             date = row[HEADINGDATE]
             genre = row[HEADINGGENRE]
             identifier = row[HEADINGIDENTIFIER]
             articles.append({"date":date,"genre":genre,"identifier":identifier})
         except: sys.exit(COMMAND+": missing data on line "+str(lineNbr))
+>>>>>>> df7f9dbb1b12f1b4daf4d613ad489a55cad86293
     return(articles)
 
 def abbreviateName(name): 
@@ -51,8 +66,13 @@ def readWebPage(url):
         text = str(urlopen(url,data=None).read(),encoding="utf-8")
         return(text)
     except Exception as e:
+<<<<<<< HEAD
+        print(COMMAND+": problem retrieving url: "+url+" "+str(e))
+        return("")
+=======
         print(COMMAND+": problem retrieving url: "+url+" "+str(e),file=sys.stderr)
         return("( geen tekst beschikbaar )")
+>>>>>>> df7f9dbb1b12f1b4daf4d613ad489a55cad86293
 
 def removeXML(text):
     text = re.sub(r"<[^<>]*>",r" ",text)
