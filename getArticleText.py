@@ -79,7 +79,11 @@ def makeUrl(date):
 def getUrlData(url):
     print(url)
     time.sleep(1)
-    return(str(urlopen(url,data=None).read(),encoding="utf-8"))
+    try: result = str(urlopen(url,data=None).read(),encoding="utf-8")
+    except Exception as e:
+        result = "TEXT NOT FOUND!"
+        print("cannot open url:",url,file=sys.stderr)
+    return(result)
 
 def getArticleUrls(datePageId):
     url = makeUrl(datePageId)
