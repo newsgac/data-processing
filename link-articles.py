@@ -1,4 +1,4 @@
-#!/usr/local//bin/python3 -W all
+#!/usr/bin/env python3
 # link-articles.py: link meta data to newspaper article texts
 # usage: link-articles.py (via cgi)
 # 20180706 erikt(at)xs4all.nl
