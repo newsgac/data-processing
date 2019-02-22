@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -W all
 """
     compareLinks.py: compare text-metadata links by two annotators
-    usage: compareLinks.py file1 file2
+    usage: compareLinks.py file1 file2 metaDataFile
     20180726 erikt(at)xs4all.nl
 """
 
@@ -12,7 +12,7 @@ import warnings
 
 COMMAND = sys.argv.pop(0)
 IDFIELD = "Artikel ID"
-KBIDFIELD = "KB-identifier"
+KBIDFIELD = "Identifier"
 GENREFIELD = "Genre"
 METADATAIDFIELD = "metadataId"
 DATEFIELD = "Datum"
@@ -104,7 +104,7 @@ def compare(annotations1,annotations2,locations,genres):
     for textId in links1:
         if not textId in links2: 
             noLinks += 1
-            print("no link: ",links1[textId],"-",locations[links1[textId]],textId.split(":")[4])
+            # print("no link: ",links1[textId],"-",locations[links1[textId]],textId.split(":")[4])
         else:
             if links2[textId] == links1[textId]:
                 totalEqualPairs += 1
@@ -129,7 +129,7 @@ def compare(annotations1,annotations2,locations,genres):
 
 def main(argv):
     try: annotationFile1,annotationFile2,metadataFile = argv
-    except: sys.exit("usage:",COMMAND,"file1 file2")
+    except: sys.exit("usage:"+COMMAND+" file1 file2")
     annotations1 = readAnnotations(annotationFile1,[])
     annotations2 = readAnnotations(annotationFile2,[])
     genres,locations = readMetadata(metadataFile)
