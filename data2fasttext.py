@@ -20,7 +20,9 @@ from urllib.request import urlopen
 COMMAND = sys.argv.pop(0)
 HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
-HEADINGIDENTIFIER = "Identifier"
+HEADINGIDENTIFIER = "KB-identifier"
+HEADINGNEWSPAPER = "Titel krant"
+HEADINGPAGE = "Paginanummer"
 INSECUREURL = r"^http:"
 LABELLENGTH = 3
 LABELPREFIX = "__label__"
@@ -30,8 +32,12 @@ URLPREFIX = r"http"
 URLSUFFIX = ":ocr"
 
 def standardizeDate(dateString):
-    try: date = datetime.strptime(dateString,"%m/%d/%Y")
-    except Exception as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
+    if re.search("^\d+-\d+-\d+$",dateString):
+        try: date = datetime.strptime(dateString,"%d-%m-%Y")
+        except Exception as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
+    elif re.search("^\d+/\d+/\d+$",dateString):
+        try: date = datetime.strptime(dateString,"%m/%d/%Y")
+        except Exception as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
     return(date.strftime("%m/%d/%Y"))
 
 def readFile():
@@ -41,11 +47,9 @@ def readFile():
     for row in csvReader:
         lineNbr += 1
         try:
-            date = standardizeDate(row[HEADINGDATE])
-            genre = row[HEADINGGENRE]
-            identifier = row[HEADINGIDENTIFIER]
-            articles.append({"date":date,"genre":genre,"identifier":identifier})
-        except: sys.exit(COMMAND+": missing data on line "+str(lineNbr))
+            row[HEADINGDATE] = standardizeDate(row[HEADINGDATE])
+            articles.append(row)
+        except Exception as e: sys.exit(COMMAND+": missing data on line "+str(lineNbr)+": "+row+": "+str(e))
     return(articles)
 
 def abbreviateName(name): 
@@ -89,13 +93,12 @@ def addUrlSuffix(url):
 def printData(articles):
     cache = {}
     for i in range(0,len(articles)):
-        date = articles[i]["date"]
-        genre = abbreviateName(articles[i]["genre"])
+        genre = abbreviateName(articles[i][HEADINGGENRE])
         allText = ""
-        for url in articles[i]["identifier"].rstrip().split():
+        for url in articles[i][HEADINGIDENTIFIER].rstrip().split():
             if not isUrl(url): 
                 sys.exit(COMMAND+": not an url: "+url)
-            url = addUrlSuffix(makeUrlSecure(url))
+            url = addUrlSuffix(url)
             if url in cache: 
                     text = cache[url]
             else:
@@ -103,7 +106,13 @@ def printData(articles):
                 cache[url] = text
             if allText == "": allText = text
             else: allText += " "+text
-        print(LABELPREFIX+genre+" DATE="+date+" "+allText)
+        print(LABELPREFIX+genre,end="")
+        print(" DATE="+articles[i][HEADINGDATE],end="")
+        print(" NEWSPAPER="+re.sub("\s","_",articles[i][HEADINGNEWSPAPER]),end="")
+        print(" PAGE="+articles[i][HEADINGPAGE],end="")
+        print(" LENGTH="+str(len(allText)),end="")
+        print(" URLS="+re.sub(" ",",",re.sub(":ocr","",articles[i][HEADINGIDENTIFIER])),end="")
+        print(" "+allText)
 
 def main(argv):
     articles = readFile()
