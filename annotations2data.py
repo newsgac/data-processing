@@ -23,6 +23,7 @@ DATE = "Datum"
 PAGE = "Paginanummer"
 GENRE = "Genre"
 URLS = "KB-identifier"
+SPACE = " "
 
 def readCsv(inFileName,delimiter=COMMA):
     try:
@@ -43,8 +44,7 @@ def list2dict(listIn,keyColumnName):
         except Exception as e: sys.exit(COMMAND+": problem with element: "+row+"+: "+str(e))
     return(dictOut)
 
-def combineLists(metadataList,annotationsList):
-    annotationsDict = list2dict(annotationsList,METADATAID)
+def combineLists(metadataList,annotationsDict):
     metadataDict = list2dict(metadataList,METADATAID)
     outList = []
     for key in annotationsDict:
@@ -55,7 +55,7 @@ def combineLists(metadataList,annotationsList):
             outList.append({METADATAID:key,\
                NEWSPAPER:metadataDict[key][NEWSPAPER],\
                DATE:metadataDict[key][DATE],PAGE:metadataDict[key][PAGE],\
-               GENRE:metadataDict[key][GENRE],URLS:annotationsDict[key][URLS]})
+               GENRE:metadataDict[key][GENRE],URLS:annotationsDict[key]})
         except: print(key)
     return(outList)
 
@@ -65,10 +65,37 @@ def writeCsv(listIn):
         csvwriter.writeheader()
         for row in listIn: csvwriter.writerow(row)
 
+def removeUrl(urls,urlTarget):
+    urlListIn = set(urls.split(SPACE))
+    urlListOut = []
+    for url in urlListIn:
+        if url != urlTarget: urlListOut.append(url)
+    return(SPACE.join(urlListOut))
+
+def removeDuplicates(annotationsList):
+    metadataIdsDict = {}
+    urlsDict = {}
+    for element in annotationsList:
+        metadataId = element[METADATAID]
+        urls = element[URLS]
+        for url in set(urls.split(SPACE)):
+            if url in urlsDict:
+                metadataIdsDict[urlsDict[url]] = removeUrl(metadataIdsDict[urlsDict[url]],url)
+                if metadataIdsDict[urlsDict[url]] == "":
+                    del(metadataIdsDict[urlsDict[url]])
+                del(urlsDict[url])
+        if metadataId in metadataIdsDict:
+            for url in set(metadataIdsDict[metadataId].split(SPACE)): del (urlsDict[url])
+            del(metadataIdsDict[metadataId])
+        metadataIdsDict[metadataId] = urls
+        for url in urls.split(SPACE): urlsDict[url] = metadataId
+    return(metadataIdsDict)
+
 def main(argv):
     metadataList = readCsv(METADATAFILE)
     annotationsList = readCsv("-",TAB)
-    listOut = combineLists(metadataList,annotationsList)
+    annotationsDict = removeDuplicates(annotationsList)
+    listOut = combineLists(metadataList,annotationsDict)
     writeCsv(listOut)
 
 if __name__ == "__main__":
