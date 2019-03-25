@@ -14,10 +14,8 @@ import sys
 import xml.etree.ElementTree as ET
  
 COMMAND = sys.argv[0]
-YEAR = 1965
-MONTH = 1
-DAY = 2
-NEWSPAPER = "volkskrant"
+NEWSPAPER = "telegraaf"
+DATE = "1/2/1965"
 PAPERFIELD = "Titel krant"
 DATEFIELD = "Datum"
 PAGEFIELD = "Paginanummer"
@@ -89,6 +87,13 @@ SCRIPTTEXT = """
 </script>
 """
 
+def decodeDate(date):
+    try:
+        month,day,year = date.split("/")
+        return(year,month,day)
+    except Exception as e:
+        sys.exit(COMMAND+": error decoding date: "+date)
+
 def readTexts(newspaper,date,page):
     texts = []
     xmlFileName = XMLDIR+"/"+newspaper+"-"+date+"-"+page+".xml"
@@ -106,23 +111,37 @@ def readTexts(newspaper,date,page):
         print("<p><font style=\"color:red\">Failed while reading file: "+xmlFileName+"</font>")
     return(texts)
  
-def readMetaData(newspaper,date,page):
-    dataOut = []
-    maxPages = {}
+def readMetaDataByKey(lastKey):
     try:
         inFile = open(METADATAFILE,"r",encoding="utf-8")
-        csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA)
+        csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA,quotechar='"')
         for row in csvReader:
-            if row[PAPERFIELD] == newspaper and \
-               row[DATEFIELD] == date:
-                if row[PAGEFIELD] == page: dataOut.append(row)
-                if not date in maxPages or \
-                   int(row[PAGEFIELD]) > maxPages[date]:
-                    maxPages[date] = int(row[PAGEFIELD])
+            if row[IDFIELD] == lastKey:
+                return(row[PAPERFIELD],row[DATEFIELD],row[PAGEFIELD])
+        inFile.close()
+        return(NEWSPAPER,DATE,"1")
+    except Exception as e:
+        sys.exit(COMMAND+": error processing file "+METADATAFILE+": "+str(e))
+
+def readMetaDataByPage(newspaper,date,page):
+    try:
+        dataOut = []
+        maxPages = {}
+        inFile = open(METADATAFILE,"r",encoding="utf-8")
+        csvReader = csv.DictReader(inFile,delimiter=SEPARATORCOMMA,quotechar='"')
+        for row in csvReader:
+            if row[PAPERFIELD] == newspaper:
+                if row[DATEFIELD] == date:
+                    if row[PAGEFIELD] == page: 
+                        dataOut.append(row)
+                    if not date in maxPages or \
+                       int(row[PAGEFIELD]) > maxPages[date]:
+                        maxPages[date] = int(row[PAGEFIELD])
         dataOut = sorted(dataOut,key=lambda r: float(r["Invoernummer"]))
         inFile.close()
-    except: pass
-    return(dataOut,maxPages)
+        return(dataOut,maxPages)
+    except Exception as e:
+        sys.exit(COMMAND+": error processing file "+METADATAFILE+": "+str(e))
 
 def readMetaDataIds(ids):
     dataOut = {}
@@ -159,26 +178,28 @@ def removeLink(annotated,reverse,textId):
 def readAnnotations(fileName,preAnnotated):
     annotated = dict(preAnnotated)
     reverse = makeReverse(annotated)
+    lastKey = ""
     try:
         inFile = open(fileName,"r",encoding="utf-8")
         csvReader = csv.DictReader(inFile,delimiter=SEPARATORTAB)
         for row in csvReader:
             if IDFIELD in row:
                 thisKey = row[IDFIELD]
+                lastKey = thisKey
                 if KBIDFIELD in row: textIds = row[KBIDFIELD]
                 else: textIds = ""
                 for textId in textIds.split():
                     if textId in reverse: annotated,reverse = removeLink(annotated,reverse,textId)
                 if thisKey in annotated:
                     for textId in annotated[thisKey][TEXTIDSFIELD].split():
-                        annotated,reverse = removeLink(annotated,reverse,textId)
+                        annotated,reverse = removeLink(annotated,reverse,textId) 
                 for textId in textIds.split(): reverse[textId] = thisKey
                 if textIds != "": 
                     annotated[thisKey] = {TEXTIDSFIELD:textIds}
         inFile.close()
     except Exception as e: 
         sys.exit(COMMAND+": error processing file "+fileName+": "+str(e))
-    return(annotated)
+    return(annotated,lastKey)
  
 def printText(text):
     shortText = text["text"][0:80]
@@ -324,8 +345,9 @@ def main(argv):
         storeAnnotations(cgiData["metadataId"].value,cgiData["textId"].value)
     elif "metadataId" in cgiData:
         storeAnnotations(cgiData["metadataId"].value,"")
-    annotated = readAnnotations(PREANNOTATEDFILE,[])
-    annotated = readAnnotations(ANNOTATIONSFILE,annotated)
+    annotated,lastKey = readAnnotations(PREANNOTATEDFILE,{})
+    annotated,lastKey = readAnnotations(ANNOTATIONSFILE,annotated)
+    lastNewspaper,lastDate,lastPageNbr = readMetaDataByKey(lastKey)
     if len(argv) > 1: printAnnotated(annotated)
 
     # make sure stdout accepts utf data
@@ -333,29 +355,30 @@ def main(argv):
     print("Content-Type: text/html\n")
     print("<html><head>"+SCRIPTTEXT+"</head><body>")
 
-    newspaper = str(NEWSPAPER)
+    newspaper = lastNewspaper
     if "newspaper" in cgiData: newspaper = cgiData["newspaper"].value.lower()
-    if newspaper == "volkskrant":
+    if newspaper == "volkskrant" or newspaper == "08De Volkskrant":
+        newspaper = "volkskrant"
         NEWSPAPERMETA = "08De Volkskrant"
         NEWSPAPERXML1965 = "08De-Volkskrant"
         NEWSPAPERXML1985 = "08De-Volkskrant"
-    elif newspaper == "nrc":
+    elif newspaper == "nrc" or newspaper == "05NRC Handelsblad":
+        newspaper = "nrc"
         NEWSPAPERMETA = "05NRC Handelsblad"
         NEWSPAPERXML1965 = "00Algemeen-Handelsblad"
         NEWSPAPERXML1985 = "05NRC-Handelsblad"
-    elif newspaper == "telegraaf":
+    elif newspaper == "telegraaf" or newspaper == "06De Telegraaf":
+        newspaper = "telegraaf"
         NEWSPAPERMETA = "06De Telegraaf"
         NEWSPAPERXML1965 = "06De-Telegraaf"
         NEWSPAPERXML1985 = "06De-Telegraaf"
     else: sys.exit("unknown newspaper")
 
-    year = str(YEAR)
+    year,month,day = decodeDate(lastDate)
     if "year" in cgiData: year = cgiData["year"].value
-    month = str(MONTH)
     if "month" in cgiData: month = cgiData["month"].value
-    day = str(DAY)
     if "day" in cgiData: day = cgiData["day"].value
-    pageNbr = 1
+    pageNbr = lastPageNbr
     if "page" in cgiData:
         if "prev" in cgiData: pageNbr = str(int(cgiData["page"].value)-1)
         elif "next" in cgiData: pageNbr = str(int(cgiData["page"].value)+1)
@@ -387,7 +410,7 @@ def main(argv):
     pageNbr = str(pageNbr)
     newspaper = NEWSPAPERMETA
     date = month+"/"+day+"/"+year
-    metadata,maxPages = readMetaData(newspaper,date,pageNbr)
+    metadata,maxPages = readMetaDataByPage(newspaper,date,pageNbr)
     if year == "1965": newspaper = NEWSPAPERXML1965
     else: newspaper = NEWSPAPERXML1985
     if len(month) < 2: month = "0"+month
