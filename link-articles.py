@@ -249,6 +249,18 @@ def printLine(texts,metadata,annotated,metadataIndex):
     print("</td></tr>")
     return()
 
+def moveIds(texts,targetIds,metadataIndex):
+    for t in range(0,len(targetIds)):
+        for j in range(0,len(texts)):
+            for k in range(0,len(texts[j])):
+                if metadataIndex != j and targetIds[t] == texts[j][k]["id"]:
+                    if t == 0 and len(texts[metadataIndex]) > 0 and len(texts[metadataIndex][0]) > 0:
+                        texts[j].extend(texts[metadataIndex])
+                    texts[metadataIndex].append(texts[j][k])
+                    texts[j] = texts[j][0:k] + texts[j][k+1:]
+                    break
+    return(texts)
+
 def reorderTexts(metadata,texts,annotated):
     for i in range(0,len(texts)): texts[i] = [texts[i]]
     for i in range(len(texts),len(metadata)):
@@ -260,6 +272,7 @@ def reorderTexts(metadata,texts,annotated):
             metadataIndex = metadataKeys[metadataKey]
             textIds = annotated[metadataKey]["textIds"]
             targetIds = textIds.split(" ")
+            #texts = moveIds(texts,targetIds,metadataIndex)
             for j in range(0,len(texts)):
                 for k in range(0,len(texts[j])):
                     if metadataIndex != j and targetIds[0] == texts[j][k]["id"]:
@@ -281,23 +294,18 @@ def reorderTexts(metadata,texts,annotated):
             thisId = texts[i][j]["id"].split(":")[-2]
             metadataIds[thisId] = i
     sortedTextIds = sorted(metadataIds.keys())
+    blockedIds = {}
     for i in range(1,len(sortedTextIds)):
         thisTextId = sortedTextIds[i]
         lastTextId = sortedTextIds[i-1]
-        if metadataIds[thisTextId] >= len(metadata) or \
-           not metadata[metadataIds[thisTextId]][IDFIELD] in annotated:
-            nextMetaDataId = metadataIds[lastTextId]+1
-            while nextMetaDataId < len(metadata) and \
-                  IDFIELD in metadata[nextMetaDataId] and \
-                  metadata[nextMetaDataId][IDFIELD] in annotated:
-                nextMetaDataId += 1
-            while nextMetaDataId >= len(texts): texts.append([])
-            texts[metadataIds[thisTextId]],texts[nextMetaDataId] = \
-                texts[nextMetaDataId],texts[metadataIds[thisTextId]]
-            for mId in metadataIds.keys():
-                if metadataIds[mId] == nextMetaDataId:
-                    metadataIds[mId] = metadataIds[thisTextId]
-            metadataIds[thisTextId] = nextMetaDataId
+        metadataId = metadataIds[thisTextId]
+        nextMetadataId = metadataIds[lastTextId]+1
+        if (metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated) and \
+           (nextMetadataId >= len(metadata) or not metadata[nextMetadataId][IDFIELD] in annotated) and \
+           nextMetadataId < len(texts) and not nextMetadataId in blockedIds:
+            texts[nextMetadataId],texts[metadataId] = texts[metadataId],texts[nextMetadataId]
+            metadataIds[thisTextId] = nextMetadataId
+            blockedIds[nextMetadataId] = True
     return(texts)
 
 def convertDate(date):
