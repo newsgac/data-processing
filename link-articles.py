@@ -300,12 +300,19 @@ def reorderTexts(metadata,texts,annotated):
         lastTextId = sortedTextIds[i-1]
         metadataId = metadataIds[thisTextId]
         nextMetadataId = metadataIds[lastTextId]+1
-        if (metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated) and \
+        if nextMetadataId != metadataId and \
+           (metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated) and \
            (nextMetadataId >= len(metadata) or not metadata[nextMetadataId][IDFIELD] in annotated) and \
            nextMetadataId < len(texts) and not nextMetadataId in blockedIds:
             texts[nextMetadataId],texts[metadataId] = texts[metadataId],texts[nextMetadataId]
-            metadataIds[thisTextId] = nextMetadataId
+            for j in range(0,len(sortedTextIds)):
+                if metadataIds[sortedTextIds[j]] == nextMetadataId:
+                    metadataIds[sortedTextIds[j]],metadataIds[thisTextId] = \
+                        metadataIds[thisTextId],metadataIds[sortedTextIds[j]]
+                    break
             blockedIds[nextMetadataId] = True
+
+            #print("<br>", texts)
     return(texts)
 
 def convertDate(date):
