@@ -207,8 +207,8 @@ def printText(text):
     thisId = text["id"].split(":")[4]
     print('<div id="'+text["id"]+'" draggable="true" ondragstart="drag(event)">')
     print("<font title=\""+longText+"\">")
-    print(str(len(text["text"])),thisId,str(shortText))
-    print("</font>")
+    print(str(len(text["text"])),thisId)
+    print("</font>",str(shortText))
     print("</div>")
     return()
 
@@ -300,19 +300,29 @@ def reorderTexts(metadata,texts,annotated):
         lastTextId = sortedTextIds[i-1]
         metadataId = metadataIds[thisTextId]
         nextMetadataId = metadataIds[lastTextId]+1
-        if nextMetadataId != metadataId and \
-           (metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated) and \
+        if (metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated) and \
            (nextMetadataId >= len(metadata) or not metadata[nextMetadataId][IDFIELD] in annotated) and \
-           nextMetadataId < len(texts) and not nextMetadataId in blockedIds:
+           nextMetadataId <= len(texts) and not nextMetadataId in blockedIds:
+            if nextMetadataId == len(texts): texts.append([])
             texts[nextMetadataId],texts[metadataId] = texts[metadataId],texts[nextMetadataId]
+            swappedMetadataIds = False
             for j in range(0,len(sortedTextIds)):
                 if metadataIds[sortedTextIds[j]] == nextMetadataId:
                     metadataIds[sortedTextIds[j]],metadataIds[thisTextId] = \
                         metadataIds[thisTextId],metadataIds[sortedTextIds[j]]
+                    swappedMetadataIds = True
                     break
+            if not swappedMetadataIds: metadataIds[thisTextId] = nextMetadataId
             blockedIds[nextMetadataId] = True
-
-            #print("<br>", texts)
+    for i in range(1,len(sortedTextIds)):
+        thisTextId = sortedTextIds[i]
+        metadataId = int(metadataIds[thisTextId])
+        if metadataId >= len(metadata) or not metadata[metadataId][IDFIELD] in annotated:
+            nextMetadataId = int(metadataId)
+            while nextMetadataId > 0 and not nextMetadataId-1 in metadataIds.values(): nextMetadataId -= 1
+            if nextMetadataId < metadataId:
+                texts[nextMetadataId], texts[metadataId] = texts[metadataId], texts[nextMetadataId]
+                metadataIds[thisTextId] = nextMetadataId
     return(texts)
 
 def convertDate(date):
