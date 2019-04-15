@@ -18,6 +18,7 @@ from io import BytesIO
 from urllib.request import urlopen
 
 COMMAND = sys.argv.pop(0)
+CACHEDIR = "/home/erikt/projects/newsgac/article-linking/data/cache"
 HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
 HEADINGIDENTIFIER = "KB-identifier"
@@ -55,14 +56,41 @@ def readFile():
 def abbreviateName(name): 
     return(name[0:LABELLENGTH].upper())
 
-def readWebPage(url):
-    time.sleep(1)
+def urlToFileName(url):
+    return(re.sub("^.*=","",url))
+
+def getTextFromCache(url):
+    inFileName = urlToFileName(url)
     try:
-        text = str(urlopen(url,data=None).read(),encoding="utf-8")
+        text = ""
+        inFile = open(CACHEDIR+"/"+inFileName,"r")
+        for line in inFile: text += line
+        inFile.close()
         return(text)
+    except:
+        return("")
+
+def storeTextInCache(url,text):
+    outFileName = urlToFileName(url)
+    try:
+        outFile = open(CACHEDIR+"/"+outFileName,"w")
+        print(text,file=outFile)
+        outFile.close()
     except Exception as e:
-        print(COMMAND+": problem retrieving url: "+url+" "+str(e),file=sys.stderr)
-        return("( geen tekst beschikbaar )")
+        sys.exit(COMMAND+": error writing file "+CACHEDIR+"/"+outFileName)
+
+def readWebPage(url):
+    text = getTextFromCache(url)
+    if text != "": return(text)
+    else:
+        try:
+            time.sleep(1)
+            text = str(urlopen(url,data=None).read(),encoding="utf-8")
+            storeTextInCache(url,text)
+            return(text)
+        except Exception as e:
+            print(COMMAND+": problem retrieving url: "+url+" "+str(e),file=sys.stderr)
+            return("( geen tekst beschikbaar )")
 
 def removeXML(text):
     text = re.sub(r"<[^<>]*>",r" ",text)
@@ -90,6 +118,21 @@ def addUrlSuffix(url):
     if not re.search(URLSUFFIX+"$",url): url += URLSUFFIX
     return(url)
 
+def cleanup(text):
+    linesIn = text.split("\n")
+    linesOut = []
+    for line in linesIn:
+        wordsIn = line.split()
+        wordsOut = []
+        for word in wordsIn:
+            if re.search(r"[a-zA-Z0-9]",word): 
+                word = re.sub(r"([a-zA-Z0-9-])[^a-zA-Z0-9-]+([a-zA-Z0-9-])",r"\1\2",word)
+                word = re.sub(r"([a-zA-Z0-9-])[^a-zA-Z0-9-]+([a-zA-Z0-9-])",r"\1\2",word)
+                word = re.sub(r"[^a-zA-Z0-9][^a-zA-Z0-9][^a-zA-Z0-9]+",r"",word)
+                if len(word) > 0: wordsOut.append(word)
+        if len(wordsOut) > 0: linesOut.append(" ".join(wordsOut))
+    return("\n".join(linesOut))
+
 def printData(articles):
     cache = {}
     for i in range(0,len(articles)):
@@ -100,9 +143,11 @@ def printData(articles):
                 sys.exit(COMMAND+": not an url: "+url)
             url = addUrlSuffix(url)
             if url in cache: 
-                    text = cache[url]
+                text = cache[url]
             else:
-                text = removeRedundantWhiteSpace(tokenize(removeXML(readWebPage(url))))
+                print(removeXML(readWebPage(url)))
+                print(cleanup(removeXML(readWebPage(url))))
+                text = removeRedundantWhiteSpace(tokenize(cleanup(removeXML(readWebPage(url)))))
                 cache[url] = text
             if allText == "": allText = text
             else: allText += " "+text
