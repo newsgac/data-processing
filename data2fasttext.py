@@ -13,6 +13,7 @@ import re
 import sys
 import time
 from datetime import datetime
+from pynlpl.clients.frogclient import FrogClient
 
 from io import BytesIO
 from urllib.request import urlopen
@@ -31,6 +32,7 @@ SECUREURL = r"https:"
 SEPARATOR = ","
 URLPREFIX = r"http"
 URLSUFFIX = ":ocr"
+FROGPORT = 8080
 
 def standardizeDate(dateString):
     if re.search("^\d+-\d+-\d+$",dateString):
@@ -103,10 +105,19 @@ def removeRedundantWhiteSpace(text):
     text = re.sub(r"\s+$",r"",text)
     return(text)
 
-def tokenize(text):
+def tokenizeNLTK(text):
     tokenizedSentenceList = nltk.word_tokenize(text)
     tokenizedText = " ".join(tokenizedSentenceList)
     return(tokenizedText)
+
+def tokenizeFROG(text,frogClient):
+    resultList = frogClient.process(text)
+    resultString = ""
+    for x in resultList:
+        if x[0] != None:
+            if resultString == "": resultString = x[0]
+            else: resultString += " "+x[0]
+    return(resultString)
 
 def isUrl(url):
     return(re.search(URLPREFIX,url))
@@ -121,20 +132,23 @@ def addUrlSuffix(url):
 def cleanup(text):
     linesIn = text.split("\n")
     linesOut = []
+    WORDCHARS = r"a-zA-ZÀ-ÖØ-öø-þ0-9-"
     for line in linesIn:
         wordsIn = line.split()
         wordsOut = []
         for word in wordsIn:
-            if re.search(r"[a-zA-Z0-9]",word): 
-                word = re.sub(r"([a-zA-Z0-9-])[^a-zA-Z0-9-]+([a-zA-Z0-9-])",r"\1\2",word)
-                word = re.sub(r"([a-zA-Z0-9-])[^a-zA-Z0-9-]+([a-zA-Z0-9-])",r"\1\2",word)
-                word = re.sub(r"[^a-zA-Z0-9][^a-zA-Z0-9][^a-zA-Z0-9]+",r"",word)
+            if re.search(r"["+WORDCHARS+"]",word): 
+                word = re.sub(r"(["+WORDCHARS+"])[^"+WORDCHARS+"]+(["+WORDCHARS+"])",r"\1\2",word)
+                word = re.sub(r"(["+WORDCHARS+"])[^"+WORDCHARS+"]+(["+WORDCHARS+"])",r"\1\2",word)
+                word = re.sub(r"[^"+WORDCHARS+"][^"+WORDCHARS+"][^"+WORDCHARS+"]+",r"",word)
                 if len(word) > 0: wordsOut.append(word)
         if len(wordsOut) > 0: linesOut.append(" ".join(wordsOut))
     return("\n".join(linesOut))
 
 def printData(articles):
     cache = {}
+    frogClient = FrogClient('localhost',FROGPORT,returnall=True)
+
     for i in range(0,len(articles)):
         genre = abbreviateName(articles[i][HEADINGGENRE])
         allText = ""
@@ -145,9 +159,7 @@ def printData(articles):
             if url in cache: 
                 text = cache[url]
             else:
-                print(removeXML(readWebPage(url)))
-                print(cleanup(removeXML(readWebPage(url))))
-                text = removeRedundantWhiteSpace(tokenize(cleanup(removeXML(readWebPage(url)))))
+                text = removeRedundantWhiteSpace(tokenizeFROG(cleanup(removeXML(readWebPage(url))),frogClient))
                 cache[url] = text
             if allText == "": allText = text
             else: allText += " "+text
