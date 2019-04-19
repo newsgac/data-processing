@@ -23,6 +23,11 @@ DATE = "Datum"
 PAGE = "Paginanummer"
 GENRE = "Genre"
 URLS = "KB-identifier"
+NEWSTYPE = "Aard nieuws"
+SELFCLASS = "Zelfclassificatie"
+QUOTES = "Directe quotes"
+TOPIC = "Onderwerp"
+AUTHOR = "Soort Auteur"
 SPACE = " "
 
 def readCsv(inFileName,delimiter=COMMA):
@@ -54,8 +59,15 @@ def combineLists(metadataList,annotationsDict):
                 break
             outList.append({METADATAID:key,\
                NEWSPAPER:metadataDict[key][NEWSPAPER],\
-               DATE:metadataDict[key][DATE],PAGE:metadataDict[key][PAGE],\
-               GENRE:metadataDict[key][GENRE],URLS:annotationsDict[key]})
+               DATE:metadataDict[key][DATE],\
+               PAGE:metadataDict[key][PAGE],\
+               NEWSTYPE:metadataDict[key][NEWSTYPE],\
+               SELFCLASS:metadataDict[key][SELFCLASS],\
+               QUOTES:metadataDict[key][QUOTES],\
+               TOPIC:metadataDict[key][TOPIC],\
+               AUTHOR:metadataDict[key][AUTHOR],\
+               GENRE:metadataDict[key][GENRE],\
+               URLS:annotationsDict[key]})
         except: print(key)
     return(outList)
 

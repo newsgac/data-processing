@@ -22,6 +22,11 @@ COMMAND = sys.argv.pop(0)
 CACHEDIR = "/home/erikt/projects/newsgac/article-linking/data/cache"
 HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
+HEADINGNEWSTYPE = "Aard nieuws"
+HEADINGSELFCLASS = "Zelfclassificatie"
+HEADINGQUOTES = "Directe quotes"
+HEADINGTOPIC = "Onderwerp"
+HEADINGAUTHOR = "Soort Auteur"
 HEADINGIDENTIFIER = "KB-identifier"
 HEADINGNEWSPAPER = "Titel krant"
 HEADINGPAGE = "Paginanummer"
@@ -169,6 +174,13 @@ def printData(articles):
         print(" PAGE="+articles[i][HEADINGPAGE],end="")
         print(" LENGTH="+str(len(allText)),end="")
         print(" URLS="+re.sub(" ",",",re.sub(":ocr","",articles[i][HEADINGIDENTIFIER])),end="")
+        print(" NEWSTYPE="+articles[i][HEADINGNEWSTYPE],end="")
+        print(" SELFCLASS="+articles[i][HEADINGSELFCLASS],end="")
+        print(" QUOTES="+articles[i][HEADINGQUOTES],end="")
+        articles[i][HEADINGTOPIC] = re.sub(r" ","_",articles[i][HEADINGTOPIC])
+        print(" TOPIC="+articles[i][HEADINGTOPIC],end="")
+        articles[i][HEADINGAUTHOR] = re.sub(r" ","_",articles[i][HEADINGAUTHOR])
+        print(" AUTHOR="+articles[i][HEADINGAUTHOR],end="")
         print(" "+allText)
 
 def main(argv):
