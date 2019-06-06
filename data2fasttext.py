@@ -20,6 +20,7 @@ from urllib.request import urlopen
 
 COMMAND = sys.argv.pop(0)
 CACHEDIR = "/home/erikt/projects/newsgac/article-linking/data/cache"
+DEFAULTGENRE = "NIE"
 HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
 HEADINGNEWSTYPE = "Aard nieuws"
@@ -27,14 +28,16 @@ HEADINGSELFCLASS = "Zelfclassificatie"
 HEADINGQUOTES = "Directe quotes"
 HEADINGTOPIC = "Onderwerp"
 HEADINGAUTHOR = "Soort Auteur"
-HEADINGIDENTIFIER = "KB-identifier"
+HEADINGIDENTIFIER = "Identifier"
 HEADINGNEWSPAPER = "Titel krant"
 HEADINGPAGE = "Paginanummer"
+HEADINGTEXT = "Text"
 INSECUREURL = r"^http:"
 LABELLENGTH = 3
 LABELPREFIX = "__label__"
 SECUREURL = r"https:"
 SEPARATOR = ","
+UNKNOWN = "UNKNOWN"
 URLPREFIX = r"http"
 URLSUFFIX = ":ocr"
 FROGPORT = 8080
@@ -48,16 +51,16 @@ def standardizeDate(dateString):
         except Exception as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
     return(date.strftime("%m/%d/%Y"))
 
-def readFile():
+def readFile(csvReader):
     articles = []
     lineNbr = 0
-    csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
     for row in csvReader:
         lineNbr += 1
         try:
             row[HEADINGDATE] = standardizeDate(row[HEADINGDATE])
             articles.append(row)
         except Exception as e: sys.exit(COMMAND+": missing data on line "+str(lineNbr)+": "+row+": "+str(e))
+        break
     return(articles)
 
 def abbreviateName(name): 
@@ -155,7 +158,10 @@ def printData(articles):
     frogClient = FrogClient('localhost',FROGPORT,returnall=True)
 
     for i in range(0,len(articles)):
-        genre = abbreviateName(articles[i][HEADINGGENRE])
+        if HEADINGGENRE in articles[i]:
+            genre = abbreviateName(articles[i][HEADINGGENRE])
+        else:
+            genre = DEFAULTGENRE
         allText = ""
         for url in articles[i][HEADINGIDENTIFIER].rstrip().split():
             if not isUrl(url): 
@@ -163,6 +169,8 @@ def printData(articles):
             url = addUrlSuffix(url)
             if url in cache: 
                 text = cache[url]
+            elif HEADINGTEXT in articles[i]:
+                text = articles[i][HEADINGTEXT]
             else:
                 text = removeRedundantWhiteSpace(tokenizeFROG(cleanup(removeXML(readWebPage(url))),frogClient))
                 cache[url] = text
@@ -170,22 +178,39 @@ def printData(articles):
             else: allText += " "+text
         print(LABELPREFIX+genre,end="")
         print(" DATE="+articles[i][HEADINGDATE],end="")
+        if not HEADINGNEWSPAPER in articles[i]:
+            articles[i][HEADINGNEWSPAPER] = UNKNOWN
         print(" NEWSPAPER="+re.sub("\s","_",articles[i][HEADINGNEWSPAPER]),end="")
+        if not HEADINGPAGE in articles[i]:
+            articles[i][HEADINGPAGE] = UNKNOWN
         print(" PAGE="+articles[i][HEADINGPAGE],end="")
         print(" LENGTH="+str(len(allText)),end="")
         print(" URLS="+re.sub(" ",",",re.sub(":ocr","",articles[i][HEADINGIDENTIFIER])),end="")
+        if not HEADINGNEWSTYPE in articles[i]:
+            articles[i][HEADINGNEWSTYPE] = UNKNOWN
         print(" NEWSTYPE="+articles[i][HEADINGNEWSTYPE],end="")
+        if not HEADINGSELFCLASS in articles[i]:
+            articles[i][HEADINGSELFCLASS] = UNKNOWN
         print(" SELFCLASS="+articles[i][HEADINGSELFCLASS],end="")
+        if not HEADINGQUOTES in articles[i]:
+            articles[i][HEADINGQUOTES] = UNKNOWN
         print(" QUOTES="+articles[i][HEADINGQUOTES],end="")
+        if not HEADINGTOPIC in articles[i]:
+            articles[i][HEADINGTOPIC] = UNKNOWN
         articles[i][HEADINGTOPIC] = re.sub(r" ","_",articles[i][HEADINGTOPIC])
+        if not HEADINGAUTHOR in articles[i]:
+            articles[i][HEADINGAUTHOR] = UNKNOWN
         print(" TOPIC="+articles[i][HEADINGTOPIC],end="")
         articles[i][HEADINGAUTHOR] = re.sub(r" ","_",articles[i][HEADINGAUTHOR])
         print(" AUTHOR="+articles[i][HEADINGAUTHOR],end="")
         print(" "+allText)
 
 def main(argv):
-    articles = readFile()
-    printData(articles)
+    csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
+    while True:
+        articles = readFile(csvReader)
+        if len(articles) <= 0: break
+        printData(articles)
     sys.exit(0)
 
 if __name__ == "__main__":
