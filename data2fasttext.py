@@ -20,7 +20,7 @@ from urllib.request import urlopen
 
 COMMAND = sys.argv.pop(0)
 CACHEDIR = "/home/erikt/projects/newsgac/article-linking/data/cache"
-DEFAULTGENRE = "NIE"
+DEFAULTGENRE = "UNL"
 HEADINGDATE = "Datum"
 HEADINGGENRE = "Genre"
 HEADINGNEWSTYPE = "Aard nieuws"
@@ -50,18 +50,6 @@ def standardizeDate(dateString):
         try: date = datetime.strptime(dateString,"%m/%d/%Y")
         except Exception as e: sys.exit(COMMAND+": unexpected date string: "+dateString)
     return(date.strftime("%m/%d/%Y"))
-
-def readFile(csvReader):
-    articles = []
-    lineNbr = 0
-    for row in csvReader:
-        lineNbr += 1
-        try:
-            row[HEADINGDATE] = standardizeDate(row[HEADINGDATE])
-            articles.append(row)
-        except Exception as e: sys.exit(COMMAND+": missing data on line "+str(lineNbr)+": "+row+": "+str(e))
-        break
-    return(articles)
 
 def abbreviateName(name): 
     return(name[0:LABELLENGTH].upper())
@@ -114,8 +102,12 @@ def removeRedundantWhiteSpace(text):
     return(text)
 
 def tokenizeNLTK(text):
-    tokenizedSentenceList = nltk.word_tokenize(text)
-    tokenizedText = " ".join(tokenizedSentenceList)
+    tokenizedText = ""
+    tokenizedSentenceList = nltk.sent_tokenize(text)
+    for s in tokenizedSentenceList:
+        tokenizedWordList = nltk.word_tokenize(s)
+        if tokenizedText == "": tokenizedText = " ".join(tokenizedWordList)
+        else: tokenizedText += " "+" ".join(tokenizedWordList)
     return(tokenizedText)
 
 def tokenizeFROG(text,frogClient):
@@ -155,7 +147,7 @@ def cleanup(text):
 
 def printData(articles):
     cache = {}
-    frogClient = FrogClient('localhost',FROGPORT,returnall=True)
+    # frogClient = FrogClient('localhost',FROGPORT,returnall=True)
 
     for i in range(0,len(articles)):
         if HEADINGGENRE in articles[i]:
@@ -170,9 +162,10 @@ def printData(articles):
             if url in cache: 
                 text = cache[url]
             elif HEADINGTEXT in articles[i]:
-                text = articles[i][HEADINGTEXT]
+                text = removeRedundantWhiteSpace(tokenizeNLTK(cleanup(articles[i][HEADINGTEXT])))
             else:
-                text = removeRedundantWhiteSpace(tokenizeFROG(cleanup(removeXML(readWebPage(url))),frogClient))
+                sys.exit("cannot happen\n")
+                text = removeRedundantWhiteSpace(tokenizeNLTK(cleanup(removeXML(readWebPage(url)))))
                 cache[url] = text
             if allText == "": allText = text
             else: allText += " "+text
@@ -205,13 +198,22 @@ def printData(articles):
         print(" AUTHOR="+articles[i][HEADINGAUTHOR],end="")
         print(" "+allText)
 
-def main(argv):
+def processFile():
     csvReader = csv.DictReader(sys.stdin,delimiter=SEPARATOR)
-    while True:
-        articles = readFile(csvReader)
-        if len(articles) <= 0: break
+    articles = []
+    lineNbr = 0
+    for row in csvReader:
+        lineNbr += 1
+        try:
+            row[HEADINGDATE] = standardizeDate(row[HEADINGDATE])
+            articles.append(row)
+        except Exception as e: sys.exit(COMMAND+": missing data on line "+str(lineNbr)+": "+row+": "+str(e))
         printData(articles)
-    sys.exit(0)
+        articles = []
+
+def main(argv):
+    processFile()
+    return(0)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
