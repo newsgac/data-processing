@@ -30,18 +30,28 @@ def readLines():
 
 def main(argv):
     data,labels = readLines()
-    print("{0:3s}".format(""),end="") 
-    for labelGold in labels:
-        print(" "+getShortLabel(labelGold),end="")
-    print()
-    for labelGold in labels:
-        print(getShortLabel(labelGold),end="")
-        for labelPredicted in labels:
+    print("# column names: [",end="") 
+    for i in range(0,len(labels)):
+        labelGold = labels[i]
+        print("\""+getShortLabel(labelGold)+"\"",end="")
+        if i < len(labels)-1: print(",",end="")
+        else: print("]",end="")
+    print("")
+    for i in range(0,len(labels)):
+        labelGold = labels[i]
+        if i == 0: print("[",end="")
+        else: print(" ",end="")
+        print("[",end="")
+        for j in range(0,len(labels)):
+            labelPredicted = labels[j]
             if labelGold in data and labelPredicted in data[labelGold]:
-                print(" {0:3d}".format(data[labelGold][labelPredicted]),end="")
+                print(" {0:4d}".format(data[labelGold][labelPredicted]),end="")
             else:
-                print(" {0:3s}".format("  ."),end="")
-        print()
+                print(" {0:4d}".format(0),end="")
+            if j < len(labels)-1: print(",",end="")
+        print("]",end="")
+        if i < len(labels)-1: print(",")
+        else: print("]")
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
