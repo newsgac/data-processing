@@ -53,12 +53,19 @@ def getDate(fileName):
         sys.exit(COMMAND+": no valid date in file name "+fields[DATEFIELD])
     return(standardizeDate(fields[DATEFIELD]))
 
+def getNewspaperTitle(fileName):
+    fields = fileName.split("/")
+    fields = fields[-1].split("-")
+    return("-".join(fields[0:-2]))
+
 def main(argv):
+    sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf8",buffering=1)
     for fileName in argv:
         date = getDate(fileName)
         articles = getArticles(fileName)
+        newspaperTitle = getNewspaperTitle(fileName)
         for art in articles:
-            print(art["url"],LABEL,"DATE="+date,tokenize(art["text"]))
+            print(art["url"],LABEL,newspaperTitle,"DATE="+date,tokenize(art["text"]),sep="\t")
     sys.exit(0)
 
 if __name__ == "__main__":

@@ -110,7 +110,7 @@ def makeFileName(datePageId):
 
 def storeArticleTexts(datePageId,articleUrls,articleTexts):
     fileName = makeFileName(datePageId)
-    with open(fileName,"w") as outFile:
+    with open(fileName,"w",encoding="utf8") as outFile:
         outFile.write("<container>")
         for i in range(0,len(articleTexts)):
             articleText = re.sub(r"<.xml [^>]*>","",articleTexts[i])
