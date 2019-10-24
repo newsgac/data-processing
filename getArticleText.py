@@ -22,30 +22,60 @@ ARTICLE = "artikel"
 ILLUSTRATION = "illustratie met onderschrift"
 COMMAND = sys.argv.pop(0)
 MAXYEAR = 1995
+MAXRECORDS = 1000
 SEPARATOR = "\t"
-URLPREFIX = "http://jsru.kb.nl/sru/sru?query=type=artikel+and+page="
-URLPREFIX = "http://jsru.kb.nl/sru/sru?query=page="
-URLINFIX1 = "+and+date="
-URLINFIX2 = "+and+ppn="
-URLPOSTFIX = r"&x-collection=DDD_artikel&maximumRecords=100"
+SOFTWAREDIR = os.path.abspath(os.path.dirname(__file__))
+URLPREFIX = "http://jsru.kb.nl/sru"
+URLINFIX0 = "?query=date="
+URLINFIX1 = "+and+ppn="
+URLINFIX2 = "+and+page="
+URLPOSTFIX = r"&x-collection=DDD_artikel&maximumRecords="+str(MAXRECORDS)
+APIKEYFILENAME = SOFTWAREDIR+"/key-api.txt"
 
-ppns = { "00Algemeen Handelsblad":"400374129", 
-         "05NRC Handelsblad":"400367629", 
-         "06De Telegraaf":"832675288", 
-         "07De Maasbode":"842126635", 
-         "08De Volkskrant":"412869594"}
+ppns =   { "00Algemeen Handelsblad":"400374129", 
+           "05NRC Handelsblad":"400367629", 
+           "06De Telegraaf":"832675288", 
+           "07De Maasbode":"842126635", 
+           "08De Volkskrant":"412869594",
+           "Nederlands Dagblad":"810209039",
+           "Staatscourant":"400915472",
+           "De Tijd":"400383764",
+           "HVV":"401020185",
+           "De Waarheid":"832737666"
+         }
 titles = { "AH":"00Algemeen Handelsblad", 
            "NRC":"05NRC Handelsblad", 
            "Telegraaf":"06De Telegraaf", 
            "Maasbode":"07De Maasbode", 
-           "Volkskrant":"08De Volkskrant"}
+           "Volkskrant":"08De Volkskrant",
+           "ND":"Nederlands Dagblad",
+           "Staatscourant":"Staatscourant",
+           "Tijd":"De Tijd",
+           "HVV":"Het Vrije Volk",
+           "Waarheid":"De Waarheid"
+         }
 
-def makeDatePageId(newspaper,date,pageNbr):
+def readApiKey():
+    apiKey = ""
+    try:
+        apiKeyFile = open(APIKEYFILENAME,"r")
+        apiKey = apiKeyFile.readline().strip()
+        apiKeyFile.close()
+        apiKey = "/" + apiKey
+    except: pass
+    return(apiKey)
+
+APIKEY = readApiKey()
+
+def makeDatePageId(newspaper,date,pageNbr=None):
     if newspaper in titles: newspaper = titles[newspaper]
-    return(newspaper+SEPARATOR+date+SEPARATOR+pageNbr)
+    if pageNbr == None: return(newspaper+SEPARATOR+date)
+    else: return(newspaper+SEPARATOR+date+SEPARATOR+pageNbr)
 
 def splitDatePageId(date):
-    return(date.split(SEPARATOR))
+    items = date.split(SEPARATOR)
+    while len(items) < 3: items.append(None)
+    return(items)
 
 def checkDate(datePageId):
     newspaper,date,pageNbr = splitDatePageId(datePageId)
@@ -73,7 +103,9 @@ def convertDate(date):
 
 def makeUrl(date):
     newspaper,date,pageNbr = splitDatePageId(date)
-    url = URLPREFIX+str(pageNbr)+URLINFIX1+convertDate(date)+URLINFIX2+ppns[newspaper]+URLPOSTFIX
+    url = URLPREFIX+APIKEY+URLINFIX0+convertDate(date)+URLINFIX1+ppns[newspaper]
+    if pageNbr != None: url += URLINFIX2+str(pageNbr)
+    url +=URLPOSTFIX
     return(url)
 
 def getUrlData(url):
@@ -122,7 +154,9 @@ def storeArticleTexts(datePageId,articleUrls,articleTexts):
 
 def main(argv):
     datePageIds = readDBFile()
-    if len(argv) == 3:
+    if len(argv) == 2:
+        datePageIds[makeDatePageId(argv[0],argv[1])] = True
+    elif len(argv) == 3:
         datePageIds[makeDatePageId(argv[0],argv[1],argv[2])] = True
     for datePageId in datePageIds:
         fileName = makeFileName(datePageId)
