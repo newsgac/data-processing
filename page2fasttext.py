@@ -42,12 +42,15 @@ def getArticles(fileName):
         except: url = "EMPTY-ID!"
         articles.append({"url":url})
         for par in text:
-            if not "text" in articles[-1]: articles[-1]["text"] = par.text
-            else: articles[-1]["text"] += " "+par.text
+            if par.text != None:
+                if not "text" in articles[-1]: articles[-1]["text"] = par.text
+                else: articles[-1]["text"] += " "+par.text
+        if not "text" in articles[-1]: articles[-1]["text"] = ""
     return(articles)
 
 def getDate(fileName):
     fields = fileName.split("/")
+    fields[-1] = re.sub("\.\w\w\w$","",fields[-1])
     fields = fields[-1].split("-")
     if len(fields) <= DATEFIELD or not re.search(DATEPATTERN,fields[DATEFIELD]):
         sys.exit(COMMAND+": no valid date in file name "+fields[DATEFIELD])
@@ -56,7 +59,7 @@ def getDate(fileName):
 def getNewspaperTitle(fileName):
     fields = fileName.split("/")
     fields = fields[-1].split("-")
-    return("-".join(fields[0:-2]))
+    return("-".join(fields[0:-1]))
 
 def main(argv):
     sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf8",buffering=1)
