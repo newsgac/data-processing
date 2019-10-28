@@ -31,7 +31,9 @@ URLINFIX1 = "+and+ppn="
 URLINFIX2 = "+and+page="
 URLPOSTFIX = r"&x-collection=DDD_artikel&maximumRecords="+str(MAXRECORDS)
 APIKEYFILENAME = SOFTWAREDIR+"/key-api.txt"
+NOWAIT = "NOWAIT"
 
+wait = True
 ppns =   { "00Algemeen Handelsblad":"400374129", 
            "05NRC Handelsblad":"400367629", 
            "06De Telegraaf":"832675288", 
@@ -109,8 +111,10 @@ def makeUrl(date):
     return(url)
 
 def getUrlData(url):
-    print(url)
-    time.sleep(1)
+    global wait
+
+    #print(url)
+    if wait: time.sleep(1)
     try: result = str(urlopen(url,data=None).read(),encoding="utf-8")
     except Exception as e:
         result = "TEXT NOT FOUND!"
@@ -153,7 +157,12 @@ def storeArticleTexts(datePageId,articleUrls,articleTexts):
     return()
 
 def main(argv):
+    global wait
+
     datePageIds = readDBFile()
+    if len(argv) > 0 and argv[0] == NOWAIT:
+        wait = False
+        argv.pop(0)
     if len(argv) == 2:
         datePageIds[makeDatePageId(argv[0],argv[1])] = True
     elif len(argv) == 3:
