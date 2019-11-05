@@ -12,13 +12,20 @@ import re
 import sys
 from datetime import datetime
 import xml.etree.ElementTree as ET
+from pynlpl.clients.frogclient import FrogClient
 
 COMMAND = sys.argv.pop(0)
 DATEFIELD = 2
 DATEPATTERN = "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$"
-LABEL = "__label__UNL"
+FROG = "frog"
+FROGPORT = 8080
 INSECUREURL = r"^http:"
+LABEL = "__label__UNL"
+NLTK = "nltk"
 SECUREURL = r"https:"
+
+frogClient = None
+tokenizer = NLTK
 
 def standardizeDate(dateString):
     try: date = datetime.strptime(dateString,"%Y%m%d")
@@ -28,10 +35,25 @@ def standardizeDate(dateString):
 def makeUrlSecure(url):
     return(re.sub(INSECUREURL,SECUREURL,url))
 
-def tokenize(text):
+def tokenizeNLTK(text):
     tokenizedSentenceList = nltk.word_tokenize(text)
     tokenizedText = " ".join(tokenizedSentenceList)
     return(tokenizedText)
+
+def tokenizeFROG(text):
+    global frogClient
+    resultList = frogClient.process(text)
+    resultString = ""
+    for x in resultList:
+        if x[0] != None:
+            if resultString == "": resultString = x[0]
+            else: resultString += " "+x[0]
+    return(resultString)
+
+def tokenize(text):
+    global tokenizer
+    if tokenizer == FROG: return(tokenizeFROG(text))
+    else: return(tokenizeNLTK(text))
 
 def getArticles(fileName):
     try: dataRoot = ET.parse(fileName).getroot()
@@ -62,7 +84,12 @@ def getNewspaperTitle(fileName):
     return("-".join(fields[0:-1]))
 
 def main(argv):
+    global frogClient,tokenizer
     sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf8",buffering=1)
+    if len(argv) > 0 and argv[0] == "-f": 
+        tokenizer = FROG
+        frogClient = FrogClient('localhost',FROGPORT,returnall=True)
+        argv.pop(0)
     for fileName in argv:
         date = getDate(fileName)
         articles = getArticles(fileName)
