@@ -38,12 +38,13 @@ ppns =   { "00Algemeen Handelsblad":"400374129",
            "05NRC Handelsblad":"400367629", 
            "06De Telegraaf":"832675288", 
            "07De Maasbode":"842126635", 
-           "08De Volkskrant":"412869594",
+           "08De Volkskrant":"41286956X", # 412869594",
            "Nederlands Dagblad":"810209039",
            "Staatscourant":"400915472",
            "De Tijd":"400383764",
-           "HVV":"401020185",
-           "De Waarheid":"832737666"
+           "Het Vrije Volk":"832737143",
+           "De Waarheid":"832737666",
+           "Trouw":"412789353"
          }
 titles = { "AH":"00Algemeen Handelsblad", 
            "NRC":"05NRC Handelsblad", 
@@ -54,7 +55,8 @@ titles = { "AH":"00Algemeen Handelsblad",
            "Staatscourant":"Staatscourant",
            "Tijd":"De Tijd",
            "HVV":"Het Vrije Volk",
-           "Waarheid":"De Waarheid"
+           "Waarheid":"De Waarheid",
+           "Trouw":"Trouw"
          }
 
 def readApiKey():
