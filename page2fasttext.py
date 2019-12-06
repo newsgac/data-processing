@@ -7,7 +7,11 @@
     20181119 erikt(at)xs4all.nl
 """
 
+import gzip
 import nltk
+import os
+import pipes
+import random
 import re
 import sys
 from datetime import datetime
@@ -18,11 +22,18 @@ COMMAND = sys.argv.pop(0)
 DATEFIELD = 2
 DATEPATTERN = "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$"
 FROG = "frog"
+NLTK = "nltk"
+EUROPARL = "europarl"
+EUROPARLCOMMAND = "/usr/bin/perl /home/erikt/software/tools/tokenizer.perl -q"
 FROGPORT = 8080
 INSECUREURL = r"^http:"
 LABEL = "__label__UNL"
 NLTK = "nltk"
 SECUREURL = r"https:"
+PARFROG = "-f"
+PARNLTK = "-n"
+PAREUROPARL = "-e"
+TMPFILE = "page2fasttext."+str(os.getpid())+"."+str(int(99999*random.random()))
 
 frogClient = None
 tokenizer = NLTK
@@ -50,14 +61,32 @@ def tokenizeFROG(text):
             else: resultString += " "+x[0]
     return(resultString)
 
+def tokenizeEUROPARL(text):
+    template = pipes.Template()
+    template.append(EUROPARLCOMMAND,"--")
+    f = template.open(TMPFILE,"w")
+    f.write(text)
+    f.close()
+    f = open(TMPFILE,"r")
+    resultString = f.read()
+    f.close()
+    os.remove(TMPFILE)
+    return(resultString.strip())
+
 def tokenize(text):
     global tokenizer
-    if tokenizer == FROG: return(tokenizeFROG(text))
-    else: return(tokenizeNLTK(text))
+    if tokenizer == EUROPARL: return(tokenizeEUROPARL(text))
+    elif tokenizer == NLTK: return(tokenizeNLTK(text))
+    elif tokenizer == FROG: return(tokenizeFROG(text))
+    else: sys.exit("cannot happen")
 
 def getArticles(fileName):
-    try: dataRoot = ET.parse(fileName).getroot()
-    except: sys.exit(COMMAND+": cannot read file "+fileName)
+    if re.match(r"^.*\.gz$",fileName):
+        with gzip.open(fileName,"rb") as f: text = f.read()
+        dataRoot = ET.fromstring(text)
+    else:
+        try: dataRoot = ET.parse(fileName).getroot()
+        except: sys.exit(COMMAND+": cannot read file "+fileName)
     articles = []
     for text in dataRoot:
         try: url = makeUrlSecure(text.attrib["id"])
@@ -72,7 +101,7 @@ def getArticles(fileName):
 
 def getDate(fileName):
     fields = fileName.split("/")
-    fields[-1] = re.sub("\.\w\w\w$","",fields[-1])
+    fields[-1] = re.sub("\.\w\w\w(\.gz)?$","",fields[-1])
     fields = fields[-1].split("-")
     if len(fields) <= DATEFIELD or not re.search(DATEPATTERN,fields[DATEFIELD]):
         sys.exit(COMMAND+": no valid date in file name "+fields[DATEFIELD])
@@ -86,7 +115,10 @@ def getNewspaperTitle(fileName):
 def main(argv):
     global frogClient,tokenizer
     sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf8",buffering=1)
-    if len(argv) > 0 and argv[0] == "-f": 
+    tokenizer = EUROPARL
+    if len(argv) > 0 and argv[0] == PARNLTK:
+        tokenizer = NLTK
+    elif len(argv) > 0 and argv[0] == PARFROG: 
         tokenizer = FROG
         frogClient = FrogClient('localhost',FROGPORT,returnall=True)
         argv.pop(0)
