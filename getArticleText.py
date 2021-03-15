@@ -38,7 +38,7 @@ ppns =   { "00Algemeen Handelsblad":"400374129",
            "05NRC Handelsblad":"400367629", 
            "06De Telegraaf":"832675288", 
            "07De Maasbode":"842126635", 
-           "08De Volkskrant":"41286956X", # 412869594",
+           "08De Volkskrant":"412869594",
            "Nederlands Dagblad":"810209039",
            "Staatscourant":"400915472",
            "De Tijd":"400383764",
@@ -107,7 +107,8 @@ def convertDate(date):
 
 def makeUrl(date):
     newspaper,date,pageNbr = splitDatePageId(date)
-    url = URLPREFIX+APIKEY+URLINFIX0+convertDate(date)+URLINFIX1+ppns[newspaper]
+    if newspaper in ppns: newspaper = ppns[newspaper]
+    url = URLPREFIX+APIKEY+URLINFIX0+convertDate(date)+URLINFIX1+newspaper
     if pageNbr != None: url += URLINFIX2+str(pageNbr)
     url +=URLPOSTFIX
     return(url)

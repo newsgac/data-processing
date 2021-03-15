@@ -19,7 +19,6 @@ import xml.etree.ElementTree as ET
 from pynlpl.clients.frogclient import FrogClient
 
 COMMAND = sys.argv.pop(0)
-DATEFIELD = 2
 DATEPATTERN = "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$"
 FROG = "frog"
 NLTK = "nltk"
@@ -99,13 +98,13 @@ def getArticles(fileName):
         if not "text" in articles[-1]: articles[-1]["text"] = ""
     return(articles)
 
-def getDate(fileName):
-    fields = fileName.split("/")
-    fields[-1] = re.sub("\.\w\w\w(\.gz)?$","",fields[-1])
-    fields = fields[-1].split("-")
-    if len(fields) <= DATEFIELD or not re.search(DATEPATTERN,fields[DATEFIELD]):
-        sys.exit(COMMAND+": no valid date in file name "+fields[DATEFIELD])
-    return(standardizeDate(fields[DATEFIELD]))
+def getDate(fileDirName):
+    fileName = fileDirName.split("/")[-1]
+    fileBaseName = fileName.split(".")[0]
+    date = fileBaseName.split("-")[-1]
+    if not re.search(DATEPATTERN,date):
+        sys.exit(COMMAND+": no valid date in file name "+fileDirName+" found: "+date)
+    return(standardizeDate(date))
 
 def getNewspaperTitle(fileName):
     fields = fileName.split("/")
@@ -115,9 +114,10 @@ def getNewspaperTitle(fileName):
 def main(argv):
     global frogClient,tokenizer
     sys.stdout = open(sys.stdout.fileno(),mode="w",encoding="utf8",buffering=1)
-    tokenizer = EUROPARL
+    tokenizer = NLTK
     if len(argv) > 0 and argv[0] == PARNLTK:
         tokenizer = NLTK
+        argv.pop(0)
     elif len(argv) > 0 and argv[0] == PARFROG: 
         tokenizer = FROG
         frogClient = FrogClient('localhost',FROGPORT,returnall=True)
